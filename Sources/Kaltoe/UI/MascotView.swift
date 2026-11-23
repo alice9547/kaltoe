@@ -1,4 +1,4 @@
-// 하얀 말티즈 픽셀 마스코트. 그림 데이터는 MascotData.swift(생성물, 원본 shared/mascot.json).
+// 픽셀 마스코트(말티즈·주황이). 그림 데이터는 MascotData.swift / MascotDataOrange.swift(생성물, 원본 shared/mascot*.json).
 // 재생 규칙은 docs/spec.md 6절.
 import AppKit
 import SwiftUI
@@ -28,7 +28,7 @@ enum MascotPlayer {
     }
 
     /// sleep 의 떠오르는 z (3×3). 머리 오른쪽 위 빈 칸에서 한 칸씩 올라가며 옅어진다.
-    static func zPixels(tick: Int) -> [(x: Int, y: Int, alpha: Double)] {
+    static func zPixels(tick: Int, gridWidth: Int = MascotData.width) -> [(x: Int, y: Int, alpha: Double)] {
         let step = (tick / 5) % 4          // 0.5초
         guard step < 3 else { return [] }
         let top = 2 - step
@@ -37,7 +37,7 @@ enum MascotPlayer {
         var out: [(Int, Int, Double)] = []
         for (r, row) in shape.enumerated() {
             for (c, ch) in row.enumerated() where ch == "#" {
-                out.append((MascotData.width - 4 + c, top + r, alpha))
+                out.append((gridWidth - 4 + c, top + r, alpha))
             }
         }
         return out
@@ -51,19 +51,24 @@ struct MascotView: View {
     var onTap: () -> Void
     /// true 면 실루엣 바깥에 격자 1칸 두께 외곽선(#3A3A44). 색종이·z 에는 넣지 않는다.
     var outline: Bool = false
+    /// 캐릭터 (기본 말티즈). 재생 규칙·외곽선·점프는 캐릭터와 무관.
+    var character: MascotCharacter = .maltese
 
-    /// 약 56pt 영역에 맞는 정수 배율.
-    static let cell = max(1, Int((56.0 / Double(MascotData.width)).rounded()))
+    /// 약 56pt 영역에 맞는 정수 배율 (말티즈 기준 — 기존 호출부 호환).
+    static let cell = cell(for: .maltese)
+    static func cell(for character: MascotCharacter) -> Int {
+        max(1, Int((56.0 / Double(character.width)).rounded()))
+    }
 
     var body: some View {
-        let cell = CGFloat(Self.cell)
-        let rows = MascotData.frames[MascotPlayer.frameName(mood: mood, tick: tick)] ?? []
+        let cell = CGFloat(Self.cell(for: character))
+        let rows = character.frames[MascotPlayer.frameName(mood: mood, tick: tick)] ?? []
         let jump = MascotPlayer.jumpOffset(tick: tick, jumpStart: jumpStart)
-        let zs = mood == .sleep ? MascotPlayer.zPixels(tick: tick) : []
-        let w = MascotData.width, h = MascotData.height
+        let zs = mood == .sleep ? MascotPlayer.zPixels(tick: tick, gridWidth: character.width) : []
+        let w = character.width, h = character.height
         // 외곽선이 격자 밖 1칸까지 나가므로 그리는 영역에 여유(1칸)를 두고, 레이아웃 크기는 그대로 둔다.
         let margin = outline ? 1 : 0
-        let silhouette = outline ? Self.outlineCells(rows) : []
+        let silhouette = outline ? Self.outlineCells(rows, character: character) : []
         Canvas { context, _ in
             context.withCGContext { cg in
                 cg.setShouldAntialias(false)
@@ -78,7 +83,7 @@ struct MascotView: View {
                 for c in silhouette { fill(c.x, c.y, edge) }
                 for (y, row) in rows.enumerated() {
                     for (x, ch) in row.enumerated() {
-                        guard let hex = MascotData.palette[ch] else { continue }
+                        guard let hex = character.palette[ch] else { continue }
                         fill(x, y, NSColor(hex: hex).cgColor)
                     }
                 }
@@ -93,19 +98,17 @@ struct MascotView: View {
 }
 
 extension MascotView {
-    /// 외곽선에서 제외하는 장식 픽셀(색종이 R·Y·N·U, 반짝 별 S). mascot.json 팔레트 규약.
-    private static let decoration: Set<Character> = ["R", "Y", "N", "U", "S"]
-
     /// 불투명 픽셀(장식 제외)의 상하좌우 이웃인 투명 칸(격자 밖 -1…크기 포함).
-    static func outlineCells(_ rows: [String]) -> [(x: Int, y: Int)] {
+    static func outlineCells(_ rows: [String], character: MascotCharacter = .maltese) -> [(x: Int, y: Int)] {
+        let decoration = character.decorationPixels
         let grid = rows.map(Array.init)
         func opaque(_ x: Int, _ y: Int) -> Bool {
             y >= 0 && y < grid.count && x >= 0 && x < grid[y].count
                 && grid[y][x] != "." && !decoration.contains(grid[y][x])
         }
         var out: [(Int, Int)] = []
-        for y in -1...MascotData.height {
-            for x in -1...MascotData.width where !opaque(x, y) && !(y >= 0 && y < grid.count && x >= 0 && x < grid[y].count && grid[y][x] != ".") {
+        for y in -1...character.height {
+            for x in -1...character.width where !opaque(x, y) && !(y >= 0 && y < grid.count && x >= 0 && x < grid[y].count && grid[y][x] != ".") {
                 if opaque(x - 1, y) || opaque(x + 1, y) || opaque(x, y - 1) || opaque(x, y + 1) { out.append((x, y)) }
             }
         }
@@ -115,12 +118,14 @@ extension MascotView {
 
 enum MascotImage {
     /// 메뉴바용 템플릿 이미지: 머리 윤곽(검정)에서 눈·코·입은 투명하게 뚫는다.
-    static func menuBarTemplate(pointSize: CGFloat) -> NSImage {
-        let rows = Array((MascotData.frames["idle"] ?? []).prefix(14))
-        let cells = max(MascotData.width, rows.count)
+    static func menuBarTemplate(pointSize: CGFloat, character: MascotCharacter = .maltese) -> NSImage {
+        let idle = character.frames["idle"] ?? []
+        let range = character.menuBarRows.clamped(to: 0..<idle.count)
+        let rows = Array(idle[range])
+        let cells = max(character.width, rows.count)
         let k = 4                                   // 셀당 비트맵 픽셀 (부드럽게 축소됨)
         let px = cells * k
-        let cutouts: Set<Character> = ["K", "M", "T"]
+        let cutouts = character.menuBarCutouts
         let oy = (cells - rows.count) / 2
         let cs = CGColorSpaceCreateDeviceRGB()
         guard let cg = CGContext(data: nil, width: px, height: px, bitsPerComponent: 8, bytesPerRow: 0,

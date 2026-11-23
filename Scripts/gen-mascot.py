@@ -4,22 +4,23 @@
   python3 Scripts/gen-mascot.py
 
 산출물:
-  Sources/Kaltoe/UI/MascotData.swift
+  Sources/Kaltoe/UI/MascotData.swift, MascotDataOrange.swift
   windows/Kaltoe.App/MascotData.cs
-  Resources/AppIcon-1024.png, Resources/AppIcon.icns   (iconutil 필요, macOS)
-  windows/Kaltoe.App/Assets/app.ico, tray.ico
+  Resources/AppIcon-1024.png, Resources/AppIcon.icns   (주황이 idle, iconutil 필요, macOS)
+  windows/Kaltoe.App/Assets/app.ico (주황이), app-maltese.ico, tray.ico, tray-orange.ico
 """
 import json, os, struct, subprocess, sys, tempfile, zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRAMES = ["idle", "blink", "breathe", "sleep", "eat1", "eat2", "sparkle", "hop", "danceL", "danceR", "angry1", "angry2", "cry1", "cry2"]
-ICON_BG = (0x8E, 0xC5, 0xE8)   # 하늘색 — 흰 강아지가 또렷하게 돋보이는 쪽
+ICON_BG_MALTESE = (0x8E, 0xC5, 0xE8)   # 하늘색 — 흰 강아지가 또렷하게 돋보이는 쪽
+ICON_BG_ORANGE = (0x1B, 0x1B, 0x1F)    # 어두운 터미널색 — 주황이가 가장 또렷하게 돋보임 (크림색과 렌더링 비교 후 선택)
 HEADER = "생성된 파일 — 직접 고치지 말 것. 원본: shared/mascot.json, 생성: Scripts/gen-mascot.py"
 
 
 # ---------- 읽기·검증 ----------
-def load():
-    with open(os.path.join(ROOT, "shared", "mascot.json"), encoding="utf-8") as f:
+def load(filename="mascot.json"):
+    with open(os.path.join(ROOT, "shared", filename), encoding="utf-8") as f:
         d = json.load(f)
     w, h = d["width"], d["height"]
     pal = d["palette"]
@@ -49,7 +50,7 @@ def load():
     if extra:
         errors.append(f"알 수 없는 프레임: {sorted(extra)}")
     if errors:
-        print("mascot.json 검증 실패:", *errors[:30], sep="\n  ", file=sys.stderr)
+        print(f"{filename} 검증 실패:", *errors[:30], sep="\n  ", file=sys.stderr)
         sys.exit(1)
     return w, h, {k: int(v[1:], 16) for k, v in pal.items()}, {n: d["frames"][n] for n in FRAMES}
 
@@ -61,25 +62,32 @@ def write(path, text):
         f.write(text)
 
 
-def gen_swift(w, h, pal, frames):
+def swift_enum(name, w, h, pal, frames):
     p = ", ".join(f'"{k}": 0x{v:06X}' for k, v in pal.items())
     fr = ",\n".join(f'        "{n}": [\n' + ",\n".join(f'            "{r}"' for r in rows) + "\n        ]"
                     for n, rows in frames.items())
-    write(os.path.join(ROOT, "Sources/Kaltoe/UI/MascotData.swift"),
-          f"// {HEADER}\nenum MascotData {{\n    static let width: Int = {w}\n    static let height: Int = {h}\n"
-          f"    static let palette: [Character: UInt32] = [{p}]\n"
-          f"    static let frames: [String: [String]] = [\n{fr},\n    ]\n}}\n")
+    return (f"enum {name} {{\n    static let width: Int = {w}\n    static let height: Int = {h}\n"
+            f"    static let palette: [Character: UInt32] = [{p}]\n"
+            f"    static let frames: [String: [String]] = [\n{fr},\n    ]\n}}\n")
 
 
-def gen_cs(w, h, pal, frames):
+def cs_class(name, w, h, pal, frames):
     p = ", ".join(f"['{k}'] = 0x{v:06X}" for k, v in pal.items())
     fr = ",\n".join(f'        ["{n}"] = new[]\n        {{\n' + ",\n".join(f'            "{r}"' for r in rows) + "\n        }"
                     for n, rows in frames.items())
+    return (f"public static class {name}\n{{\n"
+            f"    public const int Width = {w};\n    public const int Height = {h};\n"
+            f"    public static readonly IReadOnlyDictionary<char, uint> Palette = new Dictionary<char, uint> {{ {p} }};\n"
+            f"    public static readonly IReadOnlyDictionary<string, string[]> Frames = new Dictionary<string, string[]>\n    {{\n{fr},\n    }};\n}}\n")
+
+
+def gen_sources(maltese, orange):
+    write(os.path.join(ROOT, "Sources/Kaltoe/UI/MascotData.swift"), f"// {HEADER}\n" + swift_enum("MascotData", *maltese))
+    write(os.path.join(ROOT, "Sources/Kaltoe/UI/MascotDataOrange.swift"),
+          f"// {HEADER}\n// 원본: shared/mascot-orange.json\n" + swift_enum("MascotDataOrange", *orange))
     write(os.path.join(ROOT, "windows/Kaltoe.App/MascotData.cs"),
-          f"// {HEADER}\nnamespace Kaltoe.App;\n\npublic static class MascotData\n{{\n"
-          f"    public const int Width = {w};\n    public const int Height = {h};\n"
-          f"    public static readonly IReadOnlyDictionary<char, uint> Palette = new Dictionary<char, uint> {{ {p} }};\n"
-          f"    public static readonly IReadOnlyDictionary<string, string[]> Frames = new Dictionary<string, string[]>\n    {{\n{fr},\n    }};\n}}\n")
+          f"// {HEADER}\nnamespace Kaltoe.App;\n\n" + cs_class("MascotData", *maltese)
+          + "\n" + cs_class("MascotDataOrange", *orange))
 
 
 # ---------- 래스터 (RGBA 비프리멀티, 리스트 기반) ----------
@@ -186,8 +194,8 @@ def ico(images):
     return head + entries + blobs
 
 
-def master_icon(frame, pal, size=1024):
-    img = rounded_bg(size, round(size * 100 / 1024), 0.225, ICON_BG)
+def master_icon(frame, pal, bg, size=1024):
+    img = rounded_bg(size, round(size * 100 / 1024), 0.225, bg)
     scale = int(size * 0.70) // len(frame[0])
     ox = (size - scale * len(frame[0])) // 2
     oy = (size - scale * len(frame)) // 2 + scale // 2
@@ -195,8 +203,8 @@ def master_icon(frame, pal, size=1024):
     return img
 
 
-def master_tray(frame, pal):
-    face = frame[0:14]
+def master_tray(frame, pal, rows=(0, 14)):
+    face = frame[rows[0]:rows[1]]
     w = len(face[0])
     side = max(w, len(face))
     scale = 32
@@ -205,12 +213,9 @@ def master_tray(frame, pal):
     return img
 
 
-def gen_icons(w, h, pal, frames):
-    idle = frames["idle"]
-    m = master_icon(idle, pal)
-    res = os.path.join(ROOT, "Resources")
-    os.makedirs(res, exist_ok=True)
-    open(os.path.join(res, "AppIcon-1024.png"), "wb").write(png(m))
+def icon_set(frame, pal, bg):
+    """마스터 1024 → {크기: Img} 캐시 함수."""
+    m = master_icon(frame, pal, bg)
     m512 = resample(m, 512, 512)
     m256 = resample(m512, 256, 256)
     cache = {1024: m, 512: m512, 256: m256}
@@ -218,7 +223,20 @@ def gen_icons(w, h, pal, frames):
         if n not in cache:
             cache[n] = resample(m256, n, n)
         return cache[n]
+    return m, at
 
+
+def gen_icons(maltese, orange):
+    w, h, pal, frames = maltese
+    ow, oh, opal, oframes = orange
+    res = os.path.join(ROOT, "Resources")
+    assets = os.path.join(ROOT, "windows/Kaltoe.App/Assets")
+    os.makedirs(res, exist_ok=True)
+    os.makedirs(assets, exist_ok=True)
+
+    # 앱 아이콘 = 주황이 idle
+    m, at = icon_set(oframes["idle"], opal, ICON_BG_ORANGE)
+    open(os.path.join(res, "AppIcon-1024.png"), "wb").write(png(m))
     with tempfile.TemporaryDirectory() as td:
         iconset = os.path.join(td, "AppIcon.iconset")
         os.makedirs(iconset)
@@ -228,20 +246,27 @@ def gen_icons(w, h, pal, frames):
         r = subprocess.run(["iconutil", "-c", "icns", iconset, "-o", os.path.join(res, "AppIcon.icns")])
         if r.returncode != 0:
             print("iconutil 실패", file=sys.stderr); sys.exit(1)
+    sizes = (16, 32, 48, 64, 128, 256)
+    open(os.path.join(assets, "app.ico"), "wb").write(ico([(n, png(at(n))) for n in sizes]))
 
-    assets = os.path.join(ROOT, "windows/Kaltoe.App/Assets")
-    os.makedirs(assets, exist_ok=True)
-    open(os.path.join(assets, "app.ico"), "wb").write(ico([(n, png(at(n))) for n in (16, 32, 48, 64, 128, 256)]))
-    t = master_tray(idle, pal)
+    # 윈도우 설정 창용 말티즈 얼굴 아이콘 (예전 말티즈 앱 아이콘과 같은 그림)
+    mm, mat = icon_set(frames["idle"], pal, ICON_BG_MALTESE)
+    open(os.path.join(res, "AppIcon-maltese-1024.png"), "wb").write(png(mm))
+    open(os.path.join(assets, "app-maltese.ico"), "wb").write(ico([(n, png(mat(n))) for n in sizes]))
+
+    # 트레이 아이콘 (배경 없이 얼굴만)
+    t = master_tray(frames["idle"], pal)
     open(os.path.join(assets, "tray.ico"), "wb").write(ico([(n, png(resample(t, n, n))) for n in (16, 20, 24, 32)]))
+    to = master_tray(oframes["idle"], opal, rows=(3, 17))
+    open(os.path.join(assets, "tray-orange.ico"), "wb").write(ico([(n, png(resample(to, n, n))) for n in (16, 20, 24, 32)]))
 
 
 def main():
-    w, h, pal, frames = load()
-    gen_swift(w, h, pal, frames)
-    gen_cs(w, h, pal, frames)
-    gen_icons(w, h, pal, frames)
-    print(f"OK: {w}x{h}, 팔레트 {len(pal)}색, 프레임 {len(frames)}개")
+    maltese = load("mascot.json")
+    orange = load("mascot-orange.json")
+    gen_sources(maltese, orange)
+    gen_icons(maltese, orange)
+    print(f"OK: 말티즈 {maltese[0]}x{maltese[1]} {len(maltese[2])}색, 주황이 {orange[0]}x{orange[1]} {len(orange[2])}색, 프레임 {len(maltese[3])}개씩")
 
 
 if __name__ == "__main__":
