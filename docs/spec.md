@@ -249,4 +249,5 @@ Process finished with exit code 0
 - 캐릭터는 둘이다: `maltese`(하얀 말티즈, 원본 `shared/mascot.json`)와 `orange`(주황색 픽셀 캐릭터 "주황이", 원본 `shared/mascot-orange.json`). 두 파일의 형식과 프레임 이름 14개는 같다. 격자 크기는 캐릭터마다 다를 수 있다.
 - 생성 스크립트는 말티즈를 `MascotData`, 주황이를 `MascotDataOrange` 로 만든다(멤버 구성 동일: 맥은 `width`/`height`/`palette`/`frames`, 윈도우는 `Width`/`Height`/`Palette`/`Frames`).
 - 설정을 바꾸면 즉시 위젯(터미널·말풍선), 맥 메뉴바 아이콘, 윈도우 트레이 아이콘(`tray.ico` / `tray-orange.ico`)이 그 캐릭터로 바뀐다. 기분·재생 규칙·외곽선·클릭 점프는 캐릭터와 무관하게 6절·5-2절 그대로다.
-- 앱 아이콘(Finder·작업 표시줄·exe 아이콘)은 설정과 무관하게 말티즈다.
+- 앱 파일 아이콘(맥 Finder 의 `.app`, 윈도우 탐색기의 `.exe`, 알림에 붙는 아이콘)은 파일에 박혀 있어 설정으로 바꿀 수 없다. 이것은 주황이로 고정한다.
+- 윈도우 설정 창의 창 아이콘은 실행 중에 바꿀 수 있으므로 선택한 캐릭터를 따른다.
