@@ -3,6 +3,21 @@ import XCTest
 
 /// docs/spec.md 4절 문구.
 final class WidgetTextTests: XCTestCase {
+    // 문구는 시스템 시간대로 시각을 찍는다. 테스트 날짜는 서울 기준이므로
+    // 다른 시간대의 컴퓨터(빌드 서버 등)에서도 같은 결과가 나오게 고정한다.
+    private var savedTimeZone: TimeZone!
+
+    override func setUp() {
+        super.setUp()
+        savedTimeZone = NSTimeZone.default
+        NSTimeZone.default = TimeZone(identifier: "Asia/Seoul")!
+    }
+
+    override func tearDown() {
+        NSTimeZone.default = savedTimeZone
+        super.tearDown()
+    }
+
     private func d(_ h: Int, _ m: Int, _ s: Int = 0) -> Date { TestCalendar.date(h, m, s) }
 
     private func snap(now: Date, clockIn: Date?, clockOut: Date?, lunch: (Date, Date)? = nil) -> WorkdaySnapshot {
