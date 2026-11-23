@@ -30,12 +30,11 @@ internal sealed class TerminalWidgetWindow : FloatingWindow, IWidgetView
         return b;
     }
 
-    private readonly MascotArt _art;
     private readonly int _fontSize;
     private readonly double _factor;
     private readonly PlacementRequest _placement;
     private readonly TextBlock _lines;
-    private readonly MascotControl _mascot;
+    private readonly IMascotView _mascot;
     private Run? _cursor;
     private string _signature = "";
     private MascotMood _mood = MascotMood.Sleep;
@@ -45,9 +44,8 @@ internal sealed class TerminalWidgetWindow : FloatingWindow, IWidgetView
 
     public event Action? HideRequested;
 
-    public TerminalWidgetWindow(MascotArt art, int fontSize, PlacementRequest placement)
+    public TerminalWidgetWindow(MascotCharacter character, int fontSize, PlacementRequest placement, PhotoSource? photo = null)
     {
-        _art = art;
         _fontSize = fontSize;
         _factor = WidgetSizing.Factor(fontSize);
         _placement = placement;
@@ -55,13 +53,10 @@ internal sealed class TerminalWidgetWindow : FloatingWindow, IWidgetView
         Width = w;
         Height = h;
 
-        var cell = WidgetSizing.MascotCell(art.Width, art.Height, fontSize, WidgetStyle.Terminal);
-        _mascot = new MascotControl(art, cell, _factor, outline: false)
-        {
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Bottom,
-            Margin = new Thickness(0, 0, 8, 6),
-        };
+        _mascot = MascotViews.Create(character, fontSize, WidgetStyle.Terminal, _factor, photo);
+        _mascot.Element.HorizontalAlignment = HorizontalAlignment.Right;
+        _mascot.Element.VerticalAlignment = VerticalAlignment.Bottom;
+        _mascot.Element.Margin = new Thickness(0, 0, 8, 6);
 
         _lines = new TextBlock
         {
@@ -77,7 +72,7 @@ internal sealed class TerminalWidgetWindow : FloatingWindow, IWidgetView
 
         var content = new Grid();
         content.Children.Add(_lines);
-        content.Children.Add(_mascot);
+        content.Children.Add(_mascot.Element);
 
         var root = new Grid();
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(26) });
@@ -218,10 +213,10 @@ internal sealed class TerminalWidgetWindow : FloatingWindow, IWidgetView
             if (_cursor is not null) _cursor.Foreground = on ? B(0xF2F2F7) : Brushes.Transparent;
         }
         double? since = double.IsNaN(_jumpStart) ? null : seconds - _jumpStart;
-        _mascot.SetPose(MascotPlayback.Resolve(_mood, seconds, since, _art.Height));
+        _mascot.Animate(_mood, seconds, since);
     }
 
-    protected override bool IsMascotHit(DependencyObject? source) => IsInside(source, _mascot);
+    protected override bool IsMascotHit(DependencyObject? source) => IsInside(source, _mascot.Element);
 
     protected override void OnMascotClicked() => _jumpStart = _seconds;
 }

@@ -91,8 +91,19 @@
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <TextBlock Style="{StaticResource Label}" Text="캐릭터" Width="90" />
                     <RadioButton x:Name="RbMaltese" Content="말티즈" GroupName="Character" Margin="0,0,16,0" VerticalAlignment="Center" />
-                    <RadioButton x:Name="RbOrange" Content="주황이" GroupName="Character" VerticalAlignment="Center" />
+                    <RadioButton x:Name="RbOrange" Content="주황이" GroupName="Character" Margin="0,0,16,0" VerticalAlignment="Center" />
+                    <RadioButton x:Name="RbPhoto" Content="사진" GroupName="Character" VerticalAlignment="Center" />
                 </StackPanel>
+                <!-- 사진 캐릭터를 고르면 나타난다 (docs/spec.md 6-3절): 미리보기, 사진 고르기…, 기본 사진으로 -->
+                <StackPanel x:Name="PhotoPanel" Orientation="Horizontal" Margin="90,0,0,4" Visibility="Collapsed">
+                    <Border Width="44" Height="44" Background="#14808080" CornerRadius="4" Padding="2">
+                        <Image x:Name="ImgPhotoPreview" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Border>
+                    <Button x:Name="BtnPickPhoto" Content="사진 고르기…" Margin="8,0,0,0" Padding="8,2" VerticalAlignment="Center" />
+                    <Button x:Name="BtnResetPhoto" Content="기본 사진으로" Margin="6,0,0,0" Padding="8,2" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock x:Name="TbPhotoError" Text="사진을 불러오지 못했습니다" Foreground="#D32F2F"
+                           Margin="90,0,0,4" Visibility="Collapsed" />
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Style="{StaticResource Label}" Text="글자 크기" Width="90" />
                     <TextBox x:Name="TbFontSize" Width="48" Margin="0" HorizontalContentAlignment="Right" MaxLength="3" />

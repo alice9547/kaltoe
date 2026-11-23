@@ -292,6 +292,7 @@ public class CharacterSettingsTests
     [Theory]
     [InlineData(MascotCharacter.Maltese, "maltese")]
     [InlineData(MascotCharacter.Orange, "orange")]
+    [InlineData(MascotCharacter.Photo, "photo")]
     public void Json_UsesLowercaseNames_AndRoundTrips(MascotCharacter c, string name)
     {
         var settings = AppSettings.Default with { Widget = new WidgetSettings { Character = c, Style = WidgetStyle.Bubble, FontSize = 16 } };
@@ -314,6 +315,7 @@ public class CharacterSettingsTests
     [Theory]
     [InlineData(MascotCharacter.Maltese)]
     [InlineData(MascotCharacter.Orange)]
+    [InlineData(MascotCharacter.Photo)]
     public void EveryCharacter_IsValid_InValidator(MascotCharacter c)
         => Assert.Null(SettingsValidator.Validate(AppSettings.Default with { Widget = new WidgetSettings { Character = c } }));
 
@@ -322,6 +324,7 @@ public class CharacterSettingsTests
     {
         Assert.Equal("tray.ico", MascotAssets.TrayIconFile(MascotCharacter.Maltese));
         Assert.Equal("tray-orange.ico", MascotAssets.TrayIconFile(MascotCharacter.Orange));
+        Assert.Equal("tray-photo.ico", MascotAssets.TrayIconFile(MascotCharacter.Photo));
         Assert.Equal("tray.ico", MascotAssets.FallbackTrayIconFile);
     }
 
@@ -330,8 +333,13 @@ public class CharacterSettingsTests
     {
         Assert.Equal("app.ico", MascotAssets.WindowIconFile(MascotCharacter.Orange));
         Assert.Equal("app-maltese.ico", MascotAssets.WindowIconFile(MascotCharacter.Maltese));
+        Assert.Equal("app-photo.ico", MascotAssets.WindowIconFile(MascotCharacter.Photo));
         Assert.Equal("app.ico", MascotAssets.FallbackWindowIconFile);
     }
+
+    [Fact]
+    public void Character_HasExactlyThreeValues_InSettingsOrder()
+        => Assert.Equal(new[] { MascotCharacter.Maltese, MascotCharacter.Orange, MascotCharacter.Photo }, Enum.GetValues<MascotCharacter>());
 
     [Fact]
     public void Demo_AcceptsCharacter()
@@ -345,6 +353,8 @@ public class CharacterSettingsTests
     {
         Assert.Equal(MascotCharacter.Orange, LaunchOptions.Parse(new[] { "--demo", "done", "--character", "Orange" }).Character);
         Assert.Equal(MascotCharacter.Maltese, LaunchOptions.Parse(new[] { "--demo", "done", "--character", "maltese" }).Character);
+        Assert.Equal(MascotCharacter.Photo, LaunchOptions.Parse(new[] { "--demo", "working", "--character", "photo" }).Character);
+        Assert.Equal(MascotCharacter.Photo, LaunchOptions.Parse(new[] { "--demo", "lunch", "--style", "bubble", "--character", "Photo" }).Character);
         Assert.Null(LaunchOptions.Parse(new[] { "--demo", "done" }).Character);
         Assert.NotNull(LaunchOptions.Parse(new[] { "--demo", "done", "--character", "cat" }).Error);
         Assert.NotNull(LaunchOptions.Parse(new[] { "--demo", "done", "--character" }).Error);

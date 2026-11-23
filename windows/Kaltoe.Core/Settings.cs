@@ -44,8 +44,8 @@ public sealed record PaySettings
 
 public enum WidgetStyle { Terminal, Bubble }
 
-/// 마스코트 캐릭터 (docs/spec.md 6-1절). maltese = 하얀 말티즈, orange = 주황이.
-public enum MascotCharacter { Maltese, Orange }
+/// 마스코트 캐릭터 (docs/spec.md 6-1절, 6-2절). maltese = 하얀 말티즈, orange = 주황이, photo = 실사 말티즈(사진).
+public enum MascotCharacter { Maltese, Orange, Photo }
 
 public sealed record WidgetSettings
 {
@@ -54,6 +54,9 @@ public sealed record WidgetSettings
 
     /// 마스코트 캐릭터. 위젯(터미널·말풍선)과 트레이 아이콘이 따라 바뀐다.
     public MascotCharacter Character { get; init; } = MascotCharacter.Maltese;
+
+    /// 사용자 지정 사진을 쓰는지 (docs/spec.md 6-3절). 사진 파일이 없거나 깨졌으면 false 처럼 동작한다(내장 사진).
+    public bool CustomPhoto { get; init; } = false;
 
     /// 위젯 글자 크기(px). 허용 8~32. 위젯 전체 비율 = FontSize / 12.
     public int FontSize { get; init; } = WidgetSizing.DefaultFontSize;
@@ -130,12 +133,26 @@ public static class TimeText
 /// 캐릭터별 트레이 아이콘 파일.
 public static class MascotAssets
 {
-    public static string TrayIconFile(MascotCharacter c) => c == MascotCharacter.Orange ? "tray-orange.ico" : "tray.ico";
+    public static string TrayIconFile(MascotCharacter c) => c switch
+    {
+        MascotCharacter.Orange => "tray-orange.ico",
+        MascotCharacter.Photo => "tray-photo.ico",
+        _ => "tray.ico",
+    };
     public const string FallbackTrayIconFile = "tray.ico";
 
-    /// 설정 창의 창 아이콘: 주황이 → app.ico(주황이 고정 앱 아이콘), 말티즈 → app-maltese.ico(없으면 app.ico).
-    public static string WindowIconFile(MascotCharacter c) => c == MascotCharacter.Maltese ? "app-maltese.ico" : "app.ico";
+    /// 설정 창의 창 아이콘: 주황이 → app.ico(주황이 고정 앱 아이콘), 말티즈 → app-maltese.ico, 실사 → app-photo.ico.
+    /// 파일이 없으면 FallbackWindowIconFile(app.ico).
+    public static string WindowIconFile(MascotCharacter c) => c switch
+    {
+        MascotCharacter.Maltese => "app-maltese.ico",
+        MascotCharacter.Photo => "app-photo.ico",
+        _ => "app.ico",
+    };
     public const string FallbackWindowIconFile = "app.ico";
+
+    /// 실사 캐릭터의 표시용 이미지(리소스). 긴 변 192px, 투명 배경.
+    public const string PhotoImageFile = "photo-maltese.png";
 }
 
 /// 위젯 글자 크기 → 전체 비율·창 크기·마스코트 배율 (docs/spec.md 5-1절).
@@ -155,6 +172,12 @@ public static class WidgetSizing
 
     public static int MascotBaseExtentOf(WidgetStyle style)
         => style == WidgetStyle.Bubble ? BubbleMascotBaseExtent : MascotBaseExtent;
+
+    /// 실사 캐릭터의 기본 표시 폭(비율 1일 때 DIP). 터미널·말풍선 모두 60 (docs/spec.md 6-2절). 정수 배율 맞춤 없이 비율만 곱한다.
+    public const int PhotoBaseExtent = 60;
+
+    /// 글자 크기에 맞춘 실사 캐릭터 표시 폭(DIP, 실수).
+    public static double PhotoExtent(int fontSize) => PhotoBaseExtent * Factor(fontSize);
 
     public static bool IsValidFontSize(int px) => px >= MinFontSize && px <= MaxFontSize;
 

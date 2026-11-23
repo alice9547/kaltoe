@@ -8,11 +8,10 @@ namespace Kaltoe.App;
 /// 문구 길이에 따라 창 폭이 바뀌어도 마스코트(오른쪽 아래)가 제자리에 있도록 창의 오른쪽 아래 모서리를 기준(anchor)으로 배치한다.
 internal sealed class BubbleWidgetWindow : FloatingWindow, IWidgetView
 {
-    private readonly MascotArt _art;
     private readonly int _fontSize;
     private readonly PlacementRequest _placement;
     private readonly BubbleControl _bubble;
-    private readonly MascotControl _mascot;
+    private readonly IMascotView _mascot;
     private MascotMood _mood = MascotMood.Sleep;
     private double _jumpStart = double.NaN;
     private double _seconds;
@@ -21,15 +20,13 @@ internal sealed class BubbleWidgetWindow : FloatingWindow, IWidgetView
     // 말풍선 위젯에는 신호등 점이 없다 — 숨기기는 메뉴로만.
     public event Action? HideRequested { add { } remove { } }
 
-    public BubbleWidgetWindow(MascotArt art, int fontSize, PlacementRequest placement)
+    public BubbleWidgetWindow(MascotCharacter character, int fontSize, PlacementRequest placement, PhotoSource? photo = null)
     {
-        _art = art;
         _fontSize = fontSize;
         _placement = placement;
         SizeToContent = SizeToContent.WidthAndHeight;
 
         var factor = WidgetSizing.Factor(fontSize);
-        var cell = WidgetSizing.MascotCell(art.Width, art.Height, fontSize, WidgetStyle.Bubble);
 
         _bubble = new BubbleControl(fontSize)
         {
@@ -38,19 +35,20 @@ internal sealed class BubbleWidgetWindow : FloatingWindow, IWidgetView
             // 꼬리가 마스코트 머리 쪽(오른쪽 아래)을 향하도록, 말풍선 오른쪽 끝을 마스코트보다 안쪽에 둔다.
             Margin = new Thickness(0, 0, Math.Round(24 * factor), 0),
         };
-        _mascot = new MascotControl(art, cell, 1.0, outline: true)
-        {
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Top,
-        };
+        _mascot = MascotViews.Create(character, fontSize, WidgetStyle.Bubble, 1.0, photo);
+        _mascot.Element.HorizontalAlignment = HorizontalAlignment.Right;
+        _mascot.Element.VerticalAlignment = VerticalAlignment.Top;
+        // 사진은 창 가장자리까지 그려지므로 덧그림이 잘리지 않게 오른쪽·아래에 작은 여유를 둔다(맥 말풍선과 같은 2px × 비율).
+        if (character == MascotCharacter.Photo)
+            _mascot.Element.Margin = new Thickness(0, 0, Math.Round(2 * factor), Math.Round(2 * factor));
 
         var grid = new Grid();
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Grid.SetRow(_bubble, 0);
-        Grid.SetRow(_mascot, 1);
+        Grid.SetRow(_mascot.Element, 1);
         grid.Children.Add(_bubble);
-        grid.Children.Add(_mascot);
+        grid.Children.Add(_mascot.Element);
         Content = grid;
 
         // 첫 레이아웃이 HWND 생성보다 먼저 끝날 수도 있어, 세 시점 모두에서 (멱등하게) 배치한다.
@@ -125,10 +123,10 @@ internal sealed class BubbleWidgetWindow : FloatingWindow, IWidgetView
     {
         _seconds = seconds;
         double? since = double.IsNaN(_jumpStart) ? null : seconds - _jumpStart;
-        _mascot.SetPose(MascotPlayback.Resolve(_mood, seconds, since, _art.Height));
+        _mascot.Animate(_mood, seconds, since);
     }
 
-    protected override bool IsMascotHit(DependencyObject? source) => IsInside(source, _mascot);
+    protected override bool IsMascotHit(DependencyObject? source) => IsInside(source, _mascot.Element);
 
     protected override void OnMascotClicked() => _jumpStart = _seconds;
 }

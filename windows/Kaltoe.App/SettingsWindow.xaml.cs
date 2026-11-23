@@ -10,6 +10,9 @@ public partial class SettingsWindow : Window
 {
     private readonly ISettingsHost _host;
     private bool _loading;
+    /// 사용자 지정 사진을 쓰는지(설정 값 widget.customPhoto). 사진 고르기·기본 사진으로 버튼이 바꾼다.
+    private bool _customPhoto;
+    private bool _photoBusy;
 
     internal SettingsWindow(ISettingsHost host)
     {
@@ -21,7 +24,7 @@ public partial class SettingsWindow : Window
 
         foreach (var tb in new[] { TbEarliest, TbHours, TbMinutes, TbFixedStart, TbFixedEnd, TbLunchStart, TbLunchEnd, TbFontSize, TbRate })
             tb.TextChanged += (_, _) => OnChanged();
-        foreach (var rb in new[] { RbFlexible, RbFixed, RbTerminal, RbBubble, RbMaltese, RbOrange, RbPerHour, RbPerMinute })
+        foreach (var rb in new[] { RbFlexible, RbFixed, RbTerminal, RbBubble, RbMaltese, RbOrange, RbPhoto, RbPerHour, RbPerMinute })
             rb.Checked += (_, _) => OnChanged();
         foreach (var cb in new[] { CbComprehensive, CbLunch, CbNotifyLunch, CbNotifyBeforeEnd, CbNotifyEnd })
         {
@@ -30,6 +33,8 @@ public partial class SettingsWindow : Window
         }
         CbLaunch.Checked += (_, _) => OnLaunchChanged();
         CbLaunch.Unchecked += (_, _) => OnLaunchChanged();
+        BtnPickPhoto.Click += OnPickPhoto;
+        BtnResetPhoto.Click += OnResetPhoto;
         BtnFontUp.Click += (_, _) => StepFont(+1);
         BtnFontDown.Click += (_, _) => StepFont(-1);
     }
@@ -81,6 +86,8 @@ public partial class SettingsWindow : Window
             RbBubble.IsChecked = s.Widget.Style == WidgetStyle.Bubble;
             RbMaltese.IsChecked = s.Widget.Character == MascotCharacter.Maltese;
             RbOrange.IsChecked = s.Widget.Character == MascotCharacter.Orange;
+            RbPhoto.IsChecked = s.Widget.Character == MascotCharacter.Photo;
+            _customPhoto = s.Widget.CustomPhoto;
             TbFontSize.Text = s.Widget.FontSize.ToString();
             CbComprehensive.IsChecked = s.Pay.Comprehensive;
             TbRate.Text = s.Pay.RateAmount?.ToString() ?? "";
@@ -89,7 +96,7 @@ public partial class SettingsWindow : Window
             RatePlaceholder.Visibility = string.IsNullOrEmpty(TbRate.Text) ? Visibility.Visible : Visibility.Collapsed;
             CbLaunch.IsChecked = _host.LaunchAtLogin;
             UpdateEnabled();
-            UpdateWindowIcon(s.Widget.Character);
+            UpdateWindowIcon(s.Widget.Character, s.Widget.CustomPhoto);
             TbPreview.Text = WidgetText.Preview(s, _host.Today, _host.TodayClockIn);
             TbError.Text = "";
         }
@@ -97,8 +104,14 @@ public partial class SettingsWindow : Window
     }
 
     /// 창 아이콘은 선택한 캐릭터를 따른다. 파일이 없으면 app.ico, 그것도 없으면 아이콘 없이 둔다.
-    private void UpdateWindowIcon(MascotCharacter character)
+    private void UpdateWindowIcon(MascotCharacter character, bool customPhoto)
     {
+        // 사용자 지정 사진이 있으면 그 사진으로 실행 중에 만든 아이콘(docs/spec.md 6-3절)
+        if (character == MascotCharacter.Photo && customPhoto && CustomPhotoStore.Current.Image is { } photo)
+        {
+            try { Icon = PhotoIcons.Window(photo); return; }
+            catch (Exception ex) { Log.Write($"설정 창 아이콘(사용자 지정 사진) 만들기 실패: {ex.Message}"); }
+        }
         foreach (var file in new[] { MascotAssets.WindowIconFile(character), MascotAssets.FallbackWindowIconFile })
         {
             try
@@ -119,6 +132,79 @@ public partial class SettingsWindow : Window
         FlexiblePanel.IsEnabled = flexible;
         FixedPanel.IsEnabled = !flexible;
         LunchPanel.IsEnabled = CbLunch.IsChecked == true;
+        UpdatePhotoPanel();
+    }
+
+    // ── 사진 (docs/spec.md 6-3절) ──
+
+    /// 사진 캐릭터를 고르면 사진 항목을 보이고, 미리보기는 지금 쓰는 사진(사용자 지정 또는 내장)을 보여 준다.
+    private void UpdatePhotoPanel()
+    {
+        var show = RbPhoto.IsChecked == true;
+        var visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        var changed = PhotoPanel.Visibility != visibility;
+        PhotoPanel.Visibility = visibility;
+        if (!show) TbPhotoError.Visibility = Visibility.Collapsed;
+        ImgPhotoPreview.Source = CustomPhotoStore.Current.Resolve(_customPhoto).Image ?? PhotoMascotControl.BuiltinImage();
+        BtnPickPhoto.IsEnabled = !_photoBusy;
+        BtnResetPhoto.IsEnabled = CustomPhotoStore.Current.HasPhoto && !_photoBusy;
+        if (changed && IsLoaded) Dispatcher.BeginInvoke(KeepInsideWorkArea);   // 높이가 늘어 아래가 화면 밖으로 나가지 않게
+    }
+
+    /// 창 아래쪽이 작업 영역 밖으로 나갔으면 위로 올린다(위쪽은 작업 영역 안에 유지).
+    private void KeepInsideWorkArea()
+    {
+        var wa = Screens.Primary();
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var top = wa.Y / dpi.DpiScaleY;
+        var bottom = (wa.Y + wa.Height) / dpi.DpiScaleY;
+        if (Top + ActualHeight > bottom) Top = Math.Max(top, bottom - ActualHeight);
+    }
+
+    private async void OnPickPhoto(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "위젯에 쓸 사진 고르기",
+            Filter = "이미지 (*.png;*.jpg;*.jpeg;*.bmp;*.gif)|*.png;*.jpg;*.jpeg;*.bmp;*.gif|모든 파일 (*.*)|*.*",
+            CheckFileExists = true,
+        };
+        if (dialog.ShowDialog(this) != true) return;
+
+        _photoBusy = true;
+        UpdatePhotoPanel();
+        try
+        {
+            var path = dialog.FileName;
+            var processed = await CustomPhotoProcessor.ProcessAsync(path);     // 읽기 → 원형 자르기 → 여백 → 512px
+            if (!CustomPhotoStore.Current.Install(processed)) throw new System.IO.IOException("저장하지 못했습니다");
+            TbPhotoError.Visibility = Visibility.Collapsed;
+            var wasOn = _customPhoto;
+            _customPhoto = true;
+            OnChanged();                                    // 값이 유효하면 저장하고 위젯·트레이에 반영
+            if (wasOn) _host.CustomPhotoChanged();          // 설정 값은 그대로지만 사진이 바뀌었다
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"사진 불러오기 실패: {ex.Message}");
+            TbPhotoError.Visibility = Visibility.Visible;   // 이전 사진은 그대로 유지
+        }
+        finally
+        {
+            _photoBusy = false;
+            UpdatePhotoPanel();
+            UpdateWindowIcon(MascotCharacter.Photo, _customPhoto);
+        }
+    }
+
+    private void OnResetPhoto(object sender, RoutedEventArgs e)
+    {
+        CustomPhotoStore.Current.Remove();
+        TbPhotoError.Visibility = Visibility.Collapsed;
+        _customPhoto = false;
+        OnChanged();                                         // customPhoto 가 꺼지면 위젯·트레이가 내장 사진으로 돌아간다
+        UpdatePhotoPanel();
+        UpdateWindowIcon(RbPhoto.IsChecked == true ? MascotCharacter.Photo : _host.CurrentSettings.Widget.Character, false);
     }
 
     private void OnLaunchChanged()
@@ -155,7 +241,7 @@ public partial class SettingsWindow : Window
             return;
         }
         TbError.Text = "";
-        UpdateWindowIcon(result.Widget.Character);
+        UpdateWindowIcon(result.Widget.Character, result.Widget.CustomPhoto);
         TbPreview.Text = WidgetText.Preview(result, _host.Today, _host.TodayClockIn);
         _host.ApplySettings(result);
     }
@@ -210,7 +296,9 @@ public partial class SettingsWindow : Window
             Widget = new WidgetSettings
             {
                 Style = RbBubble.IsChecked == true ? WidgetStyle.Bubble : WidgetStyle.Terminal,
-                Character = RbOrange.IsChecked == true ? MascotCharacter.Orange : MascotCharacter.Maltese,
+                Character = RbPhoto.IsChecked == true ? MascotCharacter.Photo
+                    : RbOrange.IsChecked == true ? MascotCharacter.Orange : MascotCharacter.Maltese,
+                CustomPhoto = _customPhoto,
                 FontSize = fontSize,
             },
             Pay = new PaySettings

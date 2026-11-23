@@ -217,6 +217,34 @@ if ($b1) {
 }
 if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }; Start-Sleep -Seconds 2
 
+# 10-2. 실사 캐릭터(docs/spec.md 6-2절): 터미널·말풍선 모두 띄워 위젯이 보이는지(프로세스가 죽지 않았는지) + 스크린샷
+$p = Launch @('--demo','working','--character','photo')
+Dump 'photo-terminal' $p; Shot 'photo-terminal'
+$pt = Widget $p
+Check 'photo-terminal-alive' (-not $p.HasExited) ""
+Check 'photo-terminal-visible' ($null -ne $pt) "rect=$($pt.X),$($pt.Y) $($pt.W)x$($pt.H)"
+if ($pt) { Check 'photo-terminal-size' ($pt.W -gt 100 -and $pt.H -gt 60) "rect=$($pt.W)x$($pt.H)" }
+if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }; Start-Sleep -Seconds 2
+$p = Launch @('--demo','lunch','--style','bubble','--character','photo')
+Dump 'photo-bubble' $p; Shot 'photo-bubble'
+$pb = Widget $p
+Check 'photo-bubble-alive' (-not $p.HasExited) ""
+Check 'photo-bubble-visible' ($null -ne $pb) "rect=$($pb.X),$($pb.Y) $($pb.W)x$($pb.H)"
+if ($pb) { Check 'photo-bubble-size' ($pb.W -gt 60 -and $pb.H -gt 60) "rect=$($pb.W)x$($pb.H)" }
+if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }; Start-Sleep -Seconds 2
+
+# 10-3. 사용자 지정 사진(docs/spec.md 6-3절): 저장소의 원본 사진을 사용자 지정 사진 처리(원형 자르기 → 여백 → 512px)로 돌려 위젯에 쓴다.
+# --custom-photo 는 데모 전용이고 설정·파일을 저장하지 않는다. 경로는 이 스크립트 위치 기준 저장소의 shared/source/maltese-photo.jpeg.
+$photoPath = (Resolve-Path (Join-Path $PSScriptRoot '..\..\shared\source\maltese-photo.jpeg')).Path
+Write-Host "custom photo: $photoPath"
+$p = Launch @('--demo','working','--character','photo','--custom-photo',('"' + $photoPath + '"'))   # 공백이 있는 경로를 위해 따옴표로 감싼다
+Dump 'photo-custom' $p; Shot 'photo-custom'
+$pc = Widget $p
+Check 'photo-custom-alive' (-not $p.HasExited) ""
+Check 'photo-custom-visible' ($null -ne $pc) "rect=$($pc.X),$($pc.Y) $($pc.W)x$($pc.H)"
+if ($pc) { Check 'photo-custom-size' ($pc.W -gt 100 -and $pc.H -gt 60) "rect=$($pc.W)x$($pc.H)" }
+if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }; Start-Sleep -Seconds 2
+
 # 11. --settings: 시작하자마자 설정 창('칼퇴 설정')이 뜬다 (데모·실제 모두)
 $p = Launch @('--demo','working','--settings')
 Dump 'settings-demo' $p; Shot '16-settings-demo'

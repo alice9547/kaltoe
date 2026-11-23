@@ -6,7 +6,7 @@ namespace Kaltoe.App;
 
 /// MascotData 의 프레임을 사각형으로 찍어 그리는 컨트롤. 안티에일리어싱 없음.
 /// 격자 둘레에 1칸 여유(외곽선용)와 점프용 위쪽 여유를 둔 캔버스에 그린다.
-internal sealed class MascotControl : FrameworkElement
+internal sealed class MascotControl : FrameworkElement, IMascotView
 {
     private const string FallbackFrame = MascotFrames.Idle;
 
@@ -41,6 +41,11 @@ internal sealed class MascotControl : FrameworkElement
 
     private int CanvasCols => _gw + 2;
     private int CanvasRows => _headroom + 1 + _gh + 1;
+
+    public FrameworkElement Element => this;
+
+    public void Animate(MascotMood mood, double seconds, double? secondsSinceJump)
+        => SetPose(MascotPlayback.Resolve(mood, seconds, secondsSinceJump, _gh));
 
     public void SetPose(MascotPose pose)
     {

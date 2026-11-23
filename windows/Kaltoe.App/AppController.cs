@@ -14,6 +14,8 @@ internal interface ISettingsHost
     DateTime? TodayClockIn { get; }
     bool LaunchAtLogin { get; set; }
     void ApplySettings(AppSettings settings);
+    /// 사용자 지정 사진 파일이 바뀌었다(고름·기본 사진으로) — 설정 값은 그대로여도 위젯·트레이 아이콘을 다시 만든다 (docs/spec.md 6-3절).
+    void CustomPhotoChanged();
 }
 
 /// 앱 전체 배선: 엔진·저장·위젯·트레이·타이머·시스템 이벤트. UI 스레드에서만 쓴다.
@@ -49,6 +51,7 @@ internal sealed class AppController : ISettingsHost, IDisposable
                 Style = options.Style ?? WidgetStyle.Terminal,
                 FontSize = options.FontSize ?? WidgetSizing.DefaultFontSize,
                 Character = options.Character ?? MascotCharacter.Maltese,
+                CustomPhoto = options.CustomPhotoPath is not null,
             };
             _demo = DemoScenario.Create(options.DemoName, DateTime.Today, widget, new PaySettings { Comprehensive = options.Comprehensive ?? new PaySettings().Comprehensive });
         }
@@ -73,6 +76,7 @@ internal sealed class AppController : ISettingsHost, IDisposable
     public void Start()
     {
         var firstRun = false;
+        ApplyCustomPhotoArgument();
         if (IsDemo)
         {
             _file = new AppFile { Settings = _demo!.Settings };
@@ -99,7 +103,7 @@ internal sealed class AppController : ISettingsHost, IDisposable
         _tray = new TrayController(actions, MenuState);
         _widgetMenu = new WidgetContextMenu(actions, MenuState);
 
-        _tray.SetCharacter(CurrentSettings.Widget.Character);
+        _tray.SetCharacter(CurrentSettings.Widget.Character, CurrentSettings.Widget.CustomPhoto);
         CreateWidget(PlacementKind.Saved);
         HookSystemEvents();
 
@@ -113,6 +117,14 @@ internal sealed class AppController : ISettingsHost, IDisposable
 
         if (firstRun) _tray.ShowBalloon(LostWidgetNotices.Title, LostWidgetNotices.FirstRunBody);
         if (_options.OpenSettings) OpenSettings(allowDemo: true);   // QA 용 --settings
+    }
+
+    /// 확인용 `--custom-photo <경로>`(데모 전용): 그 사진을 사용자 지정 사진 처리로 돌려 이번 실행에만 쓴다(파일·설정은 저장하지 않는다).
+    private void ApplyCustomPhotoArgument()
+    {
+        if (_options.CustomPhotoPath is not { } path) return;
+        try { CustomPhotoStore.Current.UseTransient(CustomPhotoProcessor.Process(path).Image); }
+        catch (Exception ex) { Log.Write($"--custom-photo 처리 실패({path}): {ex.Message}"); }
     }
 
     /// 실행 중에 앱이 다시 실행됐다(docs/spec.md 7절 2번): 위젯을 보이게 하고 기본 위치로 옮긴다. UI 스레드에서 호출.
@@ -216,9 +228,10 @@ internal sealed class AppController : ISettingsHost, IDisposable
             _widget.CloseWidget();
         }
 
+        var photo = CustomPhotoStore.Current.Resolve(s.CustomPhoto);   // 내장 사진 또는 사용자 지정 사진
         _widget = s.Style == WidgetStyle.Bubble
-            ? new BubbleWidgetWindow(MascotArt.For(s.Character), s.FontSize, request)
-            : new TerminalWidgetWindow(MascotArt.For(s.Character), s.FontSize, request);
+            ? new BubbleWidgetWindow(s.Character, s.FontSize, request, photo)
+            : new TerminalWidgetWindow(s.Character, s.FontSize, request, photo);
         _widget.Dropped += OnWidgetDropped;
         _widget.HideRequested += OnHideRequested;
         _widget.MenuRequested += OnWidgetMenuRequested;
@@ -317,7 +330,8 @@ internal sealed class AppController : ISettingsHost, IDisposable
         var now = Now();
         _engine.UpdateSettings(next, now);
 
-        if (previous.Widget.Character != next.Widget.Character) _tray?.SetCharacter(next.Widget.Character);
+        if (previous.Widget.Character != next.Widget.Character || previous.Widget.CustomPhoto != next.Widget.CustomPhoto)
+            _tray?.SetCharacter(next.Widget.Character, next.Widget.CustomPhoto);
         if (previous.Widget != next.Widget)
         {
             // 모양이 바뀌면 그 모양의 저장 위치로, 글자 크기만 바뀌면 왼쪽 위 모서리를 유지한 채 다시 만든다.
@@ -326,6 +340,17 @@ internal sealed class AppController : ISettingsHost, IDisposable
             if (_widgetVisible) _animTimer?.Start();
         }
         Render(now);
+    }
+
+    public void CustomPhotoChanged()
+    {
+        if (_disposed || IsDemo) return;
+        var w = CurrentSettings.Widget;
+        _tray?.SetCharacter(w.Character, w.CustomPhoto);
+        if (w.Character != MascotCharacter.Photo) return;      // 다른 캐릭터는 사진을 쓰지 않으므로 다시 만들 필요가 없다
+        CreateWidget(PlacementKind.KeepTopLeft);
+        if (_widgetVisible) _animTimer?.Start();
+        Render(Now());
     }
 
     /// 모양을 바꾸기 직전, 떠나는 모양의 위치를 저장 칸에 적는다.

@@ -10,6 +10,8 @@ internal static class AppPaths
     public static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Kaltoe");
     public static string Settings => Path.Combine(Dir, "settings.json");
     public static string ClockIn => Path.Combine(Dir, "clockin.json");
+    /// 사용자 지정 사진 (docs/spec.md 6-3절): %APPDATA%\Kaltoe\custom-mascot.png
+    public static string CustomPhoto => Path.Combine(Dir, "custom-mascot.png");
     public static string ErrorLog => Path.Combine(Dir, "error.log");
 }
 
@@ -19,6 +21,20 @@ internal static class FileIo
     {
         try { return File.Exists(path) ? File.ReadAllText(path, Encoding.UTF8) : null; }
         catch (Exception ex) { Log.Write($"읽기 실패 {path}: {ex.Message}"); return null; }
+    }
+
+    /// 바이너리 파일을 임시 파일에 쓰고 바꿔치기한다. 성공하면 true (실패하면 이전 파일은 그대로).
+    public static bool WriteBytesAtomic(string path, byte[] data)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var tmp = path + ".tmp";
+            File.WriteAllBytes(tmp, data);
+            File.Move(tmp, path, overwrite: true);
+            return true;
+        }
+        catch (Exception ex) { Log.Write($"쓰기 실패 {path}: {ex.Message}"); return false; }
     }
 
     /// 임시 파일에 쓰고 바꿔치기 — 쓰다가 꺼져도 기존 파일이 깨지지 않는다.

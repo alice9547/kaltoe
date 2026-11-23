@@ -103,11 +103,18 @@ internal sealed class TrayController : IDisposable
         };
     }
 
-    private System.Drawing.Icon LoadIcon() => LoadIcon(MascotCharacter.Maltese);
+    private System.Drawing.Icon LoadIcon() => LoadIcon(MascotCharacter.Maltese, customPhoto: false);
 
-    /// 캐릭터별 트레이 아이콘(tray.ico / tray-orange.ico). 없으면 tray.ico, 그것도 없으면 기본 아이콘.
-    private System.Drawing.Icon LoadIcon(MascotCharacter character)
+    /// 캐릭터별 트레이 아이콘(tray.ico / tray-orange.ico / tray-photo.ico). 없으면 tray.ico, 그것도 없으면 기본 아이콘.
+    /// 실사 캐릭터가 사용자 지정 사진을 쓰면(docs/spec.md 6-3절) 그 사진으로 실행 중에 만든 아이콘을 쓴다.
+    private System.Drawing.Icon LoadIcon(MascotCharacter character, bool customPhoto)
     {
+        if (character == MascotCharacter.Photo && customPhoto && CustomPhotoStore.Current.Image is { } photo
+            && PhotoIcons.Tray(photo) is { } custom)
+        {
+            _ownedIcon = custom;
+            return custom;
+        }
         foreach (var file in new[] { MascotAssets.TrayIconFile(character), MascotAssets.FallbackTrayIconFile })
         {
             try
@@ -130,11 +137,11 @@ internal sealed class TrayController : IDisposable
     }
 
     /// 설정에서 캐릭터를 바꾸면 트레이 아이콘도 즉시 바꾼다.
-    public void SetCharacter(MascotCharacter character)
+    public void SetCharacter(MascotCharacter character, bool customPhoto = false)
     {
         if (_disposed) return;
         var previous = _ownedIcon;
-        var icon = LoadIcon(character);
+        var icon = LoadIcon(character, customPhoto);
         _icon.Icon = icon;
         if (previous is not null && !ReferenceEquals(previous, _ownedIcon)) previous.Dispose();
     }
