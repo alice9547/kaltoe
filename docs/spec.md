@@ -225,7 +225,7 @@ Process finished with exit code 0
 
 ## 6. 마스코트
 
-하얀 말티즈 강아지 픽셀 캐릭터. 그림 데이터의 원본은 `shared/mascot.json` 하나이고, 생성 스크립트가 플랫폼별 소스(`Sources/Kaltoe/UI/MascotData.swift`, `windows/Kaltoe.App/MascotData.cs`)를 만든다.
+하얀 말티즈 강아지 픽셀 캐릭터. 그림 데이터의 원본은 `shared/mascot.json` 하나이고, 생성 스크립트가 플랫폼별 소스(`mac/Sources/Kaltoe/UI/MascotData.swift`, `windows/Kaltoe.App/MascotData.cs`)를 만든다.
 
 데이터 형식: `width`, `height`(픽셀 격자 크기), `palette`(문자 → `#RRGGBB`), `frames`(이름 → 문자열 배열, 한 문자열이 한 줄, `.` 은 투명).
 프레임 이름(고정): `idle`, `blink`, `breathe`, `sleep`, `eat1`, `eat2`, `sparkle`, `hop`, `danceL`, `danceR`, `angry1`, `angry2`, `cry1`, `cry2`.

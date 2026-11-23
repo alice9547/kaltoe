@@ -15,11 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test
+        working-directory: mac
         run: swift test
       - name: Build app
-        run: Scripts/build-app.sh
+        run: mac/Scripts/build-app.sh
       - name: Zip
-        run: ditto -c -k --keepParent dist/Kaltoe.app Kaltoe-mac.zip
+        run: ditto -c -k --keepParent mac/dist/Kaltoe.app Kaltoe-mac.zip
       - uses: actions/upload-artifact@v4
         with:
           name: Kaltoe-mac

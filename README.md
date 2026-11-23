@@ -1,4 +1,4 @@
-<p align="center"><img src="Resources/AppIcon-1024.png" width="128" alt="칼퇴 아이콘"></p>
+<p align="center"><img src="mac/Resources/AppIcon-1024.png" width="128" alt="칼퇴 아이콘"></p>
 
 # 칼퇴 (Kaltoe)
 
@@ -109,8 +109,8 @@ git clone https://github.com/alice9547/kaltoe.git
 cd kaltoe
 
 # 맥 (Xcode 또는 Swift 툴체인 필요)
-Scripts/build-app.sh --install        # /Applications/Kaltoe.app 으로 설치 후 실행
-swift test
+mac/Scripts/build-app.sh --install    # /Applications/Kaltoe.app 으로 설치 후 실행
+(cd mac && swift test)
 
 # 윈도우 (.NET SDK 11 필요) — 자세한 내용은 windows/README.md
 dotnet test windows/Kaltoe.sln
@@ -120,7 +120,7 @@ dotnet publish windows/Kaltoe.App -c Release -r win-x64 --self-contained true -p
 화면만 빨리 보고 싶으면 데모 모드를 쓰세요. 가짜 데이터가 흐릅니다.
 
 ```sh
-swift run Kaltoe --demo working --style bubble     # waiting | beforelunch | lunch | working | almost | done
+(cd mac && swift run Kaltoe --demo working --style bubble)     # waiting | beforelunch | lunch | working | almost | done
 Kaltoe.exe --demo lunch --font-size 16
 ```
 
@@ -129,7 +129,7 @@ Kaltoe.exe --demo lunch --font-size 16
 | 경로 | 내용 |
 |---|---|
 | `docs/spec.md` | 맥·윈도우 공통 명세(설정, 단계 판정, 문구, 마스코트 형식) |
-| `Sources/Kaltoe/` | 맥 앱 (Swift, SwiftUI + AppKit) |
+| `mac/` | 맥 앱 (Swift, SwiftUI + AppKit) |
 | `windows/` | 윈도우 앱 (C#, WPF) |
-| `shared/mascot.json` | 마스코트 픽셀 데이터 원본. `Scripts/gen-mascot.py`가 양쪽 소스와 아이콘을 생성 |
+| `shared/mascot.json` | 마스코트 픽셀 데이터 원본. `shared/gen-mascot.py`가 양쪽 소스와 아이콘을 생성 |
 | `.github/workflows/build.yml` | 두 플랫폼 빌드·테스트, `v*` 태그를 올리면 릴리스 생성 |

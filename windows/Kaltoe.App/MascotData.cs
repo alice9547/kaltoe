@@ -1,4 +1,4 @@
-// 생성된 파일 — 직접 고치지 말 것. 원본: shared/mascot.json, 생성: Scripts/gen-mascot.py
+// 생성된 파일 — 직접 고치지 말 것. 원본: shared/mascot.json, 생성: shared/gen-mascot.py
 namespace Kaltoe.App;
 
 public static class MascotData

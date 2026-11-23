@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Kaltoe.app 을 dist/ 에 만든다. 사용: Scripts/build-app.sh [--install]
+# Kaltoe.app 을 dist/ 에 만든다. 사용: mac/Scripts/build-app.sh [--install]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

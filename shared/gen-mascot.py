@@ -4,9 +4,9 @@
   python3 Scripts/gen-mascot.py
 
 산출물:
-  Sources/Kaltoe/UI/MascotData.swift, MascotDataOrange.swift
+  mac/Sources/Kaltoe/UI/MascotData.swift, MascotDataOrange.swift
   windows/Kaltoe.App/MascotData.cs
-  Resources/AppIcon-1024.png, Resources/AppIcon.icns   (주황이 idle, iconutil 필요, macOS)
+  mac/Resources/AppIcon-1024.png, mac/Resources/AppIcon.icns   (주황이 idle, iconutil 필요, macOS)
   windows/Kaltoe.App/Assets/app.ico (주황이), app-maltese.ico, tray.ico, tray-orange.ico
 """
 import json, os, struct, subprocess, sys, tempfile, zlib
@@ -15,7 +15,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRAMES = ["idle", "blink", "breathe", "sleep", "eat1", "eat2", "sparkle", "hop", "danceL", "danceR", "angry1", "angry2", "cry1", "cry2"]
 ICON_BG_MALTESE = (0x8E, 0xC5, 0xE8)   # 하늘색 — 흰 강아지가 또렷하게 돋보이는 쪽
 ICON_BG_ORANGE = (0x1B, 0x1B, 0x1F)    # 어두운 터미널색 — 주황이가 가장 또렷하게 돋보임 (크림색과 렌더링 비교 후 선택)
-HEADER = "생성된 파일 — 직접 고치지 말 것. 원본: shared/mascot.json, 생성: Scripts/gen-mascot.py"
+HEADER = "생성된 파일 — 직접 고치지 말 것. 원본: shared/mascot.json, 생성: shared/gen-mascot.py"
 
 
 # ---------- 읽기·검증 ----------
@@ -82,8 +82,8 @@ def cs_class(name, w, h, pal, frames):
 
 
 def gen_sources(maltese, orange):
-    write(os.path.join(ROOT, "Sources/Kaltoe/UI/MascotData.swift"), f"// {HEADER}\n" + swift_enum("MascotData", *maltese))
-    write(os.path.join(ROOT, "Sources/Kaltoe/UI/MascotDataOrange.swift"),
+    write(os.path.join(ROOT, "mac/Sources/Kaltoe/UI/MascotData.swift"), f"// {HEADER}\n" + swift_enum("MascotData", *maltese))
+    write(os.path.join(ROOT, "mac/Sources/Kaltoe/UI/MascotDataOrange.swift"),
           f"// {HEADER}\n// 원본: shared/mascot-orange.json\n" + swift_enum("MascotDataOrange", *orange))
     write(os.path.join(ROOT, "windows/Kaltoe.App/MascotData.cs"),
           f"// {HEADER}\nnamespace Kaltoe.App;\n\n" + cs_class("MascotData", *maltese)
@@ -234,7 +234,7 @@ def icon_set(frame, pal, bg, center_bbox=False):
 def gen_icons(maltese, orange):
     w, h, pal, frames = maltese
     ow, oh, opal, oframes = orange
-    res = os.path.join(ROOT, "Resources")
+    res = os.path.join(ROOT, "mac", "Resources")
     assets = os.path.join(ROOT, "windows/Kaltoe.App/Assets")
     os.makedirs(res, exist_ok=True)
     os.makedirs(assets, exist_ok=True)

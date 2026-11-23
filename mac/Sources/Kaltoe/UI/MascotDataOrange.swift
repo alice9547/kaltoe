@@ -1,4 +1,4 @@
-// 생성된 파일 — 직접 고치지 말 것. 원본: shared/mascot.json, 생성: Scripts/gen-mascot.py
+// 생성된 파일 — 직접 고치지 말 것. 원본: shared/mascot.json, 생성: shared/gen-mascot.py
 // 원본: shared/mascot-orange.json
 enum MascotDataOrange {
     static let width: Int = 16
