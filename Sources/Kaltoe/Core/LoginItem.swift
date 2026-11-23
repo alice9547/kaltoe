@@ -1,6 +1,4 @@
 // 로그인 시 자동 실행 등록 (SMAppService.mainApp).
-// TODO(conductor): [A↔B] App.swift 의 AppActions 에 연결 —
-//   actions.isLaunchAtLoginEnabled = { LoginItem.isEnabled }, actions.setLaunchAtLogin = { LoginItem.setEnabled($0) }
 import Foundation
 import ServiceManagement
 

@@ -1,7 +1,6 @@
 // 출근 시각을 감지·저장하고 매초 store.snapshot 을 갱신한다.
 // 판단 로직은 ClockInRules / SnapshotCalculator / PmsetRecovery 의 순수 함수에 있고,
 // 이 클래스는 이벤트를 받아 상태를 들고 그 함수들을 부르는 얇은 배선이다.
-// TODO(conductor): [A↔B] App.swift 가 start() 를 부르면 store.snapshot 이 매초 갱신됨 — 통합 때 실제 화면에서 확인
 import AppKit
 
 final class WorkdayEngine {

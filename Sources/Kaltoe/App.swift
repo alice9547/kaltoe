@@ -9,8 +9,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var demoTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // TODO(conductor): [A↔B] 자동 실행 토글을 LoginItem 에 연결 (지금은 빈 동작)
         var actions = AppActions()
+        actions.isLaunchAtLoginEnabled = { LoginItem.isEnabled }
+        actions.setLaunchAtLogin = { LoginItem.setEnabled($0) }
         actions.quit = { NSApp.terminate(nil) }
 
         let widget = WidgetController(store: store)
@@ -21,11 +22,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let demo = DemoMode.fromArguments() {
             startDemo(demo)
         } else {
-            // TODO(conductor): [A↔B] 실제 엔진이 store 를 갱신 — 통합 때 동작 확인
+            enableLaunchAtLoginOnFirstRun()
             let engine = WorkdayEngine(store: store)
             self.engine = engine
             engine.start()
         }
+    }
+
+    /// 앱이 꺼져 있으면 출근을 실시간으로 못 잡으므로, 처음 한 번은 자동 실행을 켠다.
+    /// 이후에는 메뉴에서 끈 상태를 존중한다.
+    private func enableLaunchAtLoginOnFirstRun() {
+        let key = "loginItem.configured"
+        guard Bundle.main.bundleIdentifier != nil,
+              !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        LoginItem.setEnabled(true)
     }
 
     /// UI 확인용 가짜 데이터. `--demo working|almost|done|waiting`

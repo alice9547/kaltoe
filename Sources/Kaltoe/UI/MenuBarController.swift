@@ -14,7 +14,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         self.store = store
         self.widget = widget
         self.actions = actions
+        // 새 항목은 메뉴바 맨 왼쪽에 생겨서, 항목이 많은 노치 맥에서는 노치 뒤로 숨는다.
+        // 처음 한 번만 오른쪽 영역(오른쪽 끝에서 약 400pt)을 기본 위치로 준다. 이후엔 ⌘드래그한 위치가 유지된다.
+        let positionKey = "NSStatusItem Preferred Position kaltoe"
+        if UserDefaults.standard.object(forKey: positionKey) == nil {
+            UserDefaults.standard.set(400.0, forKey: positionKey)
+        }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.autosaveName = "kaltoe"
         super.init()
 
         if let button = statusItem.button {
