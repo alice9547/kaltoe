@@ -49,6 +49,8 @@ struct MascotView: View {
     var tick: Int
     var jumpStart: Int?
     var onTap: () -> Void
+    /// true 면 실루엣 바깥에 격자 1칸 두께 외곽선(#3A3A44). 색종이·z 에는 넣지 않는다.
+    var outline: Bool = false
 
     /// 약 56pt 영역에 맞는 정수 배율.
     static let cell = max(1, Int((56.0 / Double(MascotData.width)).rounded()))
@@ -58,26 +60,56 @@ struct MascotView: View {
         let rows = MascotData.frames[MascotPlayer.frameName(mood: mood, tick: tick)] ?? []
         let jump = MascotPlayer.jumpOffset(tick: tick, jumpStart: jumpStart)
         let zs = mood == .sleep ? MascotPlayer.zPixels(tick: tick) : []
+        let w = MascotData.width, h = MascotData.height
+        // 외곽선이 격자 밖 1칸까지 나가므로 그리는 영역에 여유(1칸)를 두고, 레이아웃 크기는 그대로 둔다.
+        let margin = outline ? 1 : 0
+        let silhouette = outline ? Self.outlineCells(rows) : []
         Canvas { context, _ in
             context.withCGContext { cg in
                 cg.setShouldAntialias(false)
-                for z in zs {
-                    cg.setFillColor(NSColor(hex: 0xC7C7CC, alpha: CGFloat(z.alpha)).cgColor)
-                    cg.fill(CGRect(x: CGFloat(z.x) * cell, y: CGFloat(z.y) * cell, width: cell, height: cell))
+                func fill(_ x: Int, _ y: Int, _ color: CGColor) {
+                    cg.setFillColor(color)
+                    cg.fill(CGRect(x: CGFloat(x + margin) * cell, y: CGFloat(y + margin) * cell, width: cell, height: cell))
                 }
+                for z in zs {
+                    fill(z.x, z.y, NSColor(hex: 0xC7C7CC, alpha: CGFloat(z.alpha)).cgColor)
+                }
+                let edge = NSColor(hex: 0x3A3A44).cgColor
+                for c in silhouette { fill(c.x, c.y, edge) }
                 for (y, row) in rows.enumerated() {
                     for (x, ch) in row.enumerated() {
                         guard let hex = MascotData.palette[ch] else { continue }
-                        cg.setFillColor(NSColor(hex: hex).cgColor)
-                        cg.fill(CGRect(x: CGFloat(x) * cell, y: CGFloat(y) * cell, width: cell, height: cell))
+                        fill(x, y, NSColor(hex: hex).cgColor)
                     }
                 }
             }
         }
-        .frame(width: CGFloat(MascotData.width) * cell, height: CGFloat(MascotData.height) * cell)
+        .frame(width: CGFloat(w + 2 * margin) * cell, height: CGFloat(h + 2 * margin) * cell)
+        .padding(-CGFloat(margin) * cell)
         .offset(y: -CGFloat(jump) * cell)
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
+    }
+}
+
+extension MascotView {
+    /// 외곽선에서 제외하는 장식 픽셀(색종이 R·Y·N·U, 반짝 별 S). mascot.json 팔레트 규약.
+    private static let decoration: Set<Character> = ["R", "Y", "N", "U", "S"]
+
+    /// 불투명 픽셀(장식 제외)의 상하좌우 이웃인 투명 칸(격자 밖 -1…크기 포함).
+    static func outlineCells(_ rows: [String]) -> [(x: Int, y: Int)] {
+        let grid = rows.map(Array.init)
+        func opaque(_ x: Int, _ y: Int) -> Bool {
+            y >= 0 && y < grid.count && x >= 0 && x < grid[y].count
+                && grid[y][x] != "." && !decoration.contains(grid[y][x])
+        }
+        var out: [(Int, Int)] = []
+        for y in -1...MascotData.height {
+            for x in -1...MascotData.width where !opaque(x, y) && !(y >= 0 && y < grid.count && x >= 0 && x < grid[y].count && grid[y][x] != ".") {
+                if opaque(x - 1, y) || opaque(x + 1, y) || opaque(x, y - 1) || opaque(x, y + 1) { out.append((x, y)) }
+            }
+        }
+        return out
     }
 }
 

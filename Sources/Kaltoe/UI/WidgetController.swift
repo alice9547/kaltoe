@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Combine
 
 /// 포커스를 뺏지 않는 터미널 모양 플로팅 패널.
 final class WidgetPanel: NSPanel {
@@ -15,7 +16,10 @@ private final class WidgetHostingView<Content: View>: NSHostingView<Content> {
 /// 항상 최상단에 뜨는 플로팅 위젯 창.
 final class WidgetController {
     private enum Key {
-        static let origin = "widget.origin"
+        static func origin(_ style: WidgetStyle) -> String {
+            // 모양마다 자기 위치를 따로 저장한다. 터미널은 기존 키를 그대로 쓴다.
+            style == .terminal ? "widget.origin" : "widget.origin.bubble"
+        }
         static let visible = "widget.visible"
     }
 
@@ -23,11 +27,18 @@ final class WidgetController {
     private let panel: WidgetPanel
     private let clock = AnimationClock()
     private let defaults = UserDefaults.standard
+    private let settings: SettingsStore
     private var moveObserver: NSObjectProtocol?
+    private var layoutCancellable: AnyCancellable?
+    private var currentFontSize: Int
+    private var currentStyle: WidgetStyle
 
-    init(store: WorkdayStore) {
+    init(store: WorkdayStore, settings: SettingsStore) {
         self.store = store
-        let size = WidgetView.size
+        self.settings = settings
+        currentFontSize = settings.settings.fontSize
+        currentStyle = settings.settings.widgetStyle
+        let size = Self.windowSize(style: currentStyle, fontSize: currentFontSize)
         panel = WidgetPanel(contentRect: NSRect(origin: .zero, size: size),
                             styleMask: [.borderless, .nonactivatingPanel],
                             backing: .buffered, defer: false)
@@ -36,24 +47,75 @@ final class WidgetController {
         panel.isMovableByWindowBackground = true
         panel.backgroundColor = .clear
         panel.isOpaque = false
-        panel.hasShadow = true
+        panel.hasShadow = currentStyle == .terminal      // 말풍선은 그림자 없음
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
 
         // 뷰의 닫기 클로저는 아래에서 self 를 쓰므로 초기화 후 연결한다.
-        let view = WidgetView(store: store, clock: clock, onClose: { [weak self] in self?.hide() })
+        let view = WidgetRootView(store: store, settings: settings, clock: clock, onClose: { [weak self] in self?.hide() })
         let hosting = WidgetHostingView(rootView: view)
         hosting.frame = NSRect(origin: .zero, size: size)
         panel.contentView = hosting
 
-        panel.setFrameOrigin(restoredOrigin(size: size))
+        panel.setFrameOrigin(Self.clamped(NSRect(origin: restoredOrigin(style: currentStyle, size: size), size: size)).origin)
+        layoutCancellable = settings.$settings
+            .map { Layout(style: $0.widgetStyle, fontSize: $0.fontSize) }
+            .removeDuplicates()
+            .sink { [weak self] in self?.applyLayout($0) }
         // 드래그 중·후의 위치를 저장한다.
         moveObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didMoveNotification, object: panel, queue: .main
         ) { [weak self] _ in
             guard let self else { return }
-            self.defaults.set(NSStringFromPoint(self.panel.frame.origin), forKey: Key.origin)
+            self.defaults.set(NSStringFromPoint(self.panel.frame.origin), forKey: Key.origin(self.currentStyle))
         }
+    }
+
+    private struct Layout: Equatable {
+        var style: WidgetStyle
+        var fontSize: Int
+    }
+
+    static func windowSize(style: WidgetStyle, fontSize: Int) -> CGSize {
+        switch style {
+        case .terminal: return WidgetView.size(fontSize: fontSize)
+        case .bubble: return BubbleWidgetView.size(fontSize: fontSize)
+        }
+    }
+
+    /// 모양이나 글자 크기가 바뀌면 즉시 창을 바꾼다.
+    /// - 글자 크기만: 왼쪽 위 모서리를 유지하고, 화면 밖으로 나가면 안으로 밀어 넣는다.
+    /// - 모양: 그 모양에 저장된 위치로 옮긴다 (없으면 기본 위치).
+    private func applyLayout(_ layout: Layout) {
+        guard layout.style != currentStyle || layout.fontSize != currentFontSize else { return }
+        let size = Self.windowSize(style: layout.style, fontSize: layout.fontSize)
+        let old = panel.frame
+        var frame: NSRect
+        if layout.style != currentStyle {
+            currentStyle = layout.style          // didMove 가 새 모양의 키로 저장하도록 먼저 바꾼다
+            panel.hasShadow = layout.style == .terminal
+            frame = NSRect(origin: restoredOrigin(style: layout.style, size: size), size: size)
+        } else {
+            frame = NSRect(x: old.minX, y: old.maxY - size.height, width: size.width, height: size.height)
+        }
+        currentFontSize = layout.fontSize
+        frame = Self.clamped(frame)
+        panel.setFrame(frame, display: true)
+        panel.contentView?.frame = NSRect(origin: .zero, size: size)
+        panel.invalidateShadow()
+    }
+
+    /// 창이 걸쳐 있는 화면(없으면 주 화면)의 보이는 영역 안으로 밀어 넣는다.
+    static func clamped(_ frame: NSRect) -> NSRect {
+        let screen = NSScreen.screens.max { a, b in
+            let ia = a.visibleFrame.intersection(frame), ib = b.visibleFrame.intersection(frame)
+            return (ia.isNull ? 0 : ia.width * ia.height) < (ib.isNull ? 0 : ib.width * ib.height)
+        } ?? NSScreen.main
+        guard let area = screen?.visibleFrame else { return frame }
+        var f = frame
+        f.origin.x = min(max(f.origin.x, area.minX), max(area.minX, area.maxX - f.width))
+        f.origin.y = min(max(f.origin.y, area.minY), max(area.minY, area.maxY - f.height))
+        return f
     }
 
     deinit {
@@ -76,24 +138,27 @@ final class WidgetController {
 
     // MARK: 위치
 
-    private func restoredOrigin(size: CGSize) -> NSPoint {
-        if let s = defaults.string(forKey: Key.origin) {
+    private func restoredOrigin(style: WidgetStyle, size: CGSize) -> NSPoint {
+        if let s = defaults.string(forKey: Key.origin(style)) {
             let p = NSPointFromString(s)
             let frame = NSRect(origin: p, size: size)
-            // 어느 화면에든 제목 줄 일부(60×26)가 걸쳐 있어야 유효.
+            // 어느 화면에든 일부(60×26)가 걸쳐 있어야 유효.
             let valid = NSScreen.screens.contains { screen in
                 let i = screen.visibleFrame.intersection(frame)
                 return !i.isNull && i.width >= 60 && i.height >= 26
             }
             if valid { return p }
         }
-        return defaultOrigin(size: size)
+        return defaultOrigin(style: style, size: size)
     }
 
-    /// 주 화면 오른쪽 위, 메뉴바 아래 16pt.
-    private func defaultOrigin(size: CGSize) -> NSPoint {
+    /// 터미널: 주 화면 오른쪽 위, 메뉴바 아래 16pt. 말풍선: 오른쪽 아래 구석 16pt.
+    private func defaultOrigin(style: WidgetStyle, size: CGSize) -> NSPoint {
         let area = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
             ?? NSRect(x: 100, y: 100, width: 1200, height: 800)
-        return NSPoint(x: area.maxX - size.width - 16, y: area.maxY - size.height - 16)
+        switch style {
+        case .terminal: return NSPoint(x: area.maxX - size.width - 16, y: area.maxY - size.height - 16)
+        case .bubble: return NSPoint(x: area.maxX - size.width - 16, y: area.minY + 16)
+        }
     }
 }

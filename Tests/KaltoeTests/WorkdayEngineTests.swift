@@ -7,7 +7,10 @@ final class WorkdayEngineTests: XCTestCase {
     private var locked = false
     private var pendingRecovery: ((Date?) -> Void)?
     private var recoveryCalls = 0
-    private var scheduled: [[PlannedNotification]] = []
+    /// replaceNotifications 호출 기록 (day, plans)
+    private var replaced: [(day: String, plans: [PlannedNotification])] = []
+    private var scheduled: [[PlannedNotification]] { replaced.map(\.plans).filter { !$0.isEmpty } }
+    private var settingsStore: SettingsStore!
     private var authRequests = 0
     private var defaults: UserDefaults!
     private var suite = ""
@@ -17,11 +20,12 @@ final class WorkdayEngineTests: XCTestCase {
         suite = "kaltoe.engine.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)
         store = WorkdayStore()
+        settingsStore = SettingsStore(defaults: defaults)
         clock = TestCalendar.date(8, 0)
         locked = false
         pendingRecovery = nil
         recoveryCalls = 0
-        scheduled = []
+        replaced = []
         authRequests = 0
     }
 
@@ -40,8 +44,14 @@ final class WorkdayEngineTests: XCTestCase {
             self.pendingRecovery = completion
         }
         env.requestNotificationAuthorization = { [unowned self] in self.authRequests += 1 }
-        env.scheduleNotifications = { [unowned self] plans, _ in self.scheduled.append(plans) }
-        return WorkdayEngine(store: store, environment: env)
+        env.replaceNotifications = { [unowned self] day, plans, _ in self.replaced.append((day, plans)) }
+        return WorkdayEngine(store: store, settings: settingsStore, environment: env)
+    }
+
+    private func change(_ edit: (inout WorkSettings) -> Void) {
+        var s = settingsStore.settings
+        edit(&s)
+        XCTAssertEqual(settingsStore.update(s), [], "테스트가 유효한 설정만 넣어야 한다")
     }
 
     private func at(_ h: Int, _ m: Int, _ s: Int = 0, day: Int = 23) { clock = TestCalendar.date(h, m, s, day: day) }
@@ -219,8 +229,9 @@ final class WorkdayEngineTests: XCTestCase {
         XCTAssertEqual(scheduled.count, 1)
         XCTAssertEqual(scheduled[0].map(\.identifier),
                        ["kaltoe.clockOut.warning.2026-11-23", "kaltoe.clockOut.done.2026-11-23"])
+        let calls = replaced.count
         at(9, 17); e.tick(); e.noteActivation()
-        XCTAssertEqual(scheduled.count, 1, "같은 날 중복 예약 금지")
+        XCTAssertEqual(replaced.count, calls, "기록이 정해진 뒤에는 다시 예약하지 않는다")
     }
 
     // MARK: 스냅샷 매초
@@ -235,5 +246,190 @@ final class WorkdayEngineTests: XCTestCase {
         XCTAssertEqual(store.snapshot.phase, .done)
         at(18, 17); e.tick()
         XCTAssertEqual(store.snapshot.overtime, 60, accuracy: 0.001)
+    }
+
+    // MARK: 고정 모드
+
+    func testFixedMode_usesSettingTimes_withoutDetectionStorageOrRecovery() {
+        change { $0.mode = .fixed }
+        at(13, 0)                                  // 감지했다면 복구가 돌 시각
+        let e = makeEngine(); e.bootstrap()
+        XCTAssertEqual(recoveryCalls, 0)
+        XCTAssertEqual(store.snapshot.clockIn, TestCalendar.date(8, 30))
+        XCTAssertEqual(store.snapshot.clockOut, TestCalendar.date(17, 30))
+        XCTAssertEqual(store.snapshot.phase, .working)
+        e.noteScreenUnlocked(); at(13, 5); e.tick()
+        XCTAssertEqual(store.snapshot.clockIn, TestCalendar.date(8, 30), "컴퓨터 사용 여부와 무관")
+        XCTAssertTrue(defaults.dictionaryRepresentation().keys.allSatisfy { !$0.hasPrefix("clockIn.") }, "저장하지 않는다")
+    }
+
+    func testFixedMode_waitingBeforeStart_thenWorking_thenDone() {
+        change { $0.mode = .fixed }
+        at(7, 0)
+        let e = makeEngine(); e.bootstrap()
+        XCTAssertEqual(store.snapshot.phase, .waiting)
+        XCTAssertEqual(store.snapshot.target, TestCalendar.date(8, 30))
+        at(8, 18); e.tick()
+        XCTAssertEqual(store.snapshot.remaining, 12 * 60, accuracy: 0.001)
+        at(8, 30); e.tick()
+        XCTAssertEqual(store.snapshot.phase, .working)
+        at(17, 20); e.tick()
+        XCTAssertEqual(store.snapshot.phase, .almostDone)
+        at(17, 30); e.tick()
+        XCTAssertEqual(store.snapshot.phase, .done)
+    }
+
+    func testFixedMode_schedulesNotificationsAtLaunchAndOnNewDay() {
+        change { $0.mode = .fixed }
+        at(7, 0)
+        let e = makeEngine(); e.bootstrap()
+        XCTAssertEqual(scheduled.last?.map(\.fireDate), [TestCalendar.date(17, 20), TestCalendar.date(17, 30)])
+        at(0, 0, 1, day: 24); e.tick()
+        XCTAssertEqual(replaced.last?.day, "2026-11-24")
+        XCTAssertEqual(scheduled.last?.map(\.fireDate), [TestCalendar.date(17, 20, day: 24), TestCalendar.date(17, 30, day: 24)])
+    }
+
+    // MARK: 유동 모드 설정 변경
+
+    func testFlexible_workMinutesChangeRecalculatesImmediately() {
+        let e = makeEngine(); e.bootstrap()
+        at(9, 16); e.noteActivation()
+        XCTAssertEqual(store.snapshot.clockOut, TestCalendar.date(18, 16))
+        change { $0.workMinutes = 480 }
+        XCTAssertEqual(store.snapshot.clockIn, TestCalendar.date(9, 16), "출근 기록은 그대로")
+        XCTAssertEqual(store.snapshot.clockOut, TestCalendar.date(17, 16))
+        XCTAssertEqual(scheduled.last?.map(\.fireDate), [TestCalendar.date(17, 6), TestCalendar.date(17, 16)])
+        _ = e
+    }
+
+    func testFlexible_earliestStartChange_beforeRecord() {
+        at(8, 30)
+        let e = makeEngine(); e.bootstrap()
+        XCTAssertEqual(store.snapshot.phase, .waiting)
+        at(8, 40)
+        change { $0.earliestStart = TimeOfDay(8, 0) }       // 이미 지난 시각으로 낮추면 곧바로 기록
+        XCTAssertEqual(store.snapshot.clockIn, TestCalendar.date(8, 30), "활성화 시각(8:30) 이후 첫 사용")
+        _ = e
+    }
+
+    func testFlexible_earliestStartHigher_keepsWaitingUntilThen() {
+        change { $0.earliestStart = TimeOfDay(10, 30) }
+        at(10, 0)
+        let e = makeEngine(); e.bootstrap()
+        XCTAssertEqual(recoveryCalls, 0, "earliestStart 전에 실행했으니 복구 없음")
+        at(10, 29); e.tick()
+        XCTAssertEqual(store.snapshot.phase, .waiting)
+        at(10, 30); e.tick()
+        XCTAssertEqual(store.snapshot.clockIn, TestCalendar.date(10, 30), "그 전부터 쓰던 중이면 earliestStart")
+        _ = e
+    }
+
+    // MARK: 모드 전환
+
+    func testSwitchFlexibleToFixed_andBack_keepsDetectedRecord() {
+        let e = makeEngine(); e.bootstrap()
+        at(9, 16); e.noteActivation()
+        at(10, 0)
+        change { $0.mode = .fixed }
+        XCTAssertEqual(store.snapshot.clockIn, TestCalendar.date(8, 30))
+        change { $0.mode = .flexible }
+        XCTAssertEqual(store.snapshot.clockIn, TestCalendar.date(9, 16), "저장된 기록이 되살아난다")
+        XCTAssertEqual(recoveryCalls, 0)
+        _ = e
+    }
+
+    func testSwitchFixedToFlexible_withoutRecord_startsRecovery() {
+        change { $0.mode = .fixed }
+        at(13, 0)
+        let e = makeEngine(); e.bootstrap()
+        XCTAssertEqual(recoveryCalls, 0)
+        change { $0.mode = .flexible }
+        XCTAssertEqual(recoveryCalls, 1)
+        XCTAssertEqual(store.snapshot.phase, .waiting)
+        pendingRecovery?(TestCalendar.date(9, 16, 46))
+        XCTAssertEqual(store.snapshot.clockIn, TestCalendar.date(9, 16, 46))
+        _ = e
+    }
+
+    func testRecoveryResultDiscardedAfterSwitchingToFixed() {
+        at(13, 0)
+        let e = makeEngine(); e.bootstrap()
+        change { $0.mode = .fixed }
+        pendingRecovery?(TestCalendar.date(9, 16, 46))
+        XCTAssertEqual(store.snapshot.clockIn, TestCalendar.date(8, 30))
+        XCTAssertNil(defaults.object(forKey: "clockIn.2026-11-23"), "고정 모드에서는 저장하지 않는다")
+        _ = e
+    }
+
+    // MARK: 점심·알림 설정 반영
+
+    func testLunchSettingsChangeAppliesImmediately() {
+        let e = makeEngine(); e.bootstrap()
+        at(9, 16); e.noteActivation()
+        at(11, 40)
+        e.tick()
+        XCTAssertEqual(store.snapshot.phase, .working)
+        change { $0.lunchEnabled = true }
+        XCTAssertEqual(store.snapshot.phase, .lunch)
+        XCTAssertEqual(store.snapshot.target, TestCalendar.date(13, 0))
+        change { $0.lunchEnd = TimeOfDay(11, 35) }          // 점심 끝이 이미 지났다
+        XCTAssertEqual(store.snapshot.phase, .working)
+        _ = e
+    }
+
+    func testSettingsChangeReplacesNotificationsForToday() {
+        let e = makeEngine(); e.bootstrap()
+        at(9, 16); e.noteActivation()
+        let before = replaced.count
+        change { $0.lunchEnabled = true }
+        XCTAssertEqual(replaced.count, before + 1)
+        XCTAssertEqual(replaced.last?.day, "2026-11-23")
+        XCTAssertEqual(replaced.last?.plans.map(\.identifier),
+                       ["kaltoe.lunch.2026-11-23", "kaltoe.clockOut.warning.2026-11-23", "kaltoe.clockOut.done.2026-11-23"])
+        change { $0.notifyEnd = false; $0.notifyLunch = false }
+        XCTAssertEqual(replaced.last?.plans.map(\.identifier), ["kaltoe.clockOut.warning.2026-11-23"])
+        _ = e
+    }
+
+    // MARK: 오늘 출근 다시 감지
+
+    func testRedetectToday_clearsRecordAndRunsRecovery() {
+        let e = makeEngine(); e.bootstrap()
+        at(9, 40); e.noteActivation()
+        XCTAssertEqual(store.snapshot.clockIn, TestCalendar.date(9, 40))
+        at(11, 0)
+        e.redetectToday()
+        XCTAssertEqual(recoveryCalls, 1)
+        XCTAssertEqual(store.snapshot.phase, .waiting)
+        XCTAssertNil(defaults.object(forKey: "clockIn.2026-11-23"))
+        XCTAssertEqual(replaced.last?.plans.isEmpty, true, "지워진 출근 기준의 예약은 취소")
+        // 복구가 끝나기 전에는 규칙 2 가 "지금"을 기록하지 않는다
+        at(11, 0, 5); e.noteScreenUnlocked()
+        XCTAssertEqual(store.snapshot.phase, .waiting)
+        at(11, 0, 8)
+        pendingRecovery?(TestCalendar.date(9, 16, 46))
+        XCTAssertEqual(store.snapshot.clockIn, TestCalendar.date(9, 16, 46))
+        XCTAssertNotNil(defaults.object(forKey: "clockIn.2026-11-23"))
+        XCTAssertEqual(scheduled.last?.first?.fireDate, TestCalendar.date(18, 6, 46))
+    }
+
+    func testRedetectToday_failureFallsBackToMaxOfEarliestAndLaunch() {
+        at(9, 5)
+        let e = makeEngine(); e.bootstrap()
+        pendingRecovery?(TestCalendar.date(9, 16))
+        at(11, 0)
+        e.redetectToday()
+        pendingRecovery?(nil)
+        XCTAssertEqual(store.snapshot.clockIn, TestCalendar.date(9, 5), "max(earliestStart 9:00, 앱 실행 9:05)")
+        _ = e
+    }
+
+    func testRedetectToday_ignoredInFixedMode() {
+        change { $0.mode = .fixed }
+        at(11, 0)
+        let e = makeEngine(); e.bootstrap()
+        e.redetectToday()
+        XCTAssertEqual(recoveryCalls, 0)
+        XCTAssertEqual(store.snapshot.clockIn, TestCalendar.date(8, 30))
     }
 }

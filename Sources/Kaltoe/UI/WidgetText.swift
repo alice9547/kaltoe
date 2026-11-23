@@ -58,8 +58,9 @@ enum WidgetText {
 
     // MARK: 주석
 
-    static func comment(for s: WorkdaySnapshot) -> String {
-        if Calendar.current.component(.hour, from: s.now) == 12 {
+    /// `working` 단계 주석 (spec 4절, 위에서부터 먼저 맞는 것).
+    static func comment(for s: WorkdaySnapshot, lunchEnabled: Bool) -> String {
+        if !lunchEnabled, Calendar.current.component(.hour, from: s.now) == 12 {
             return "# 점심: 일단 밥부터 먹고 생각하자"
         }
         switch s.progress {
@@ -72,7 +73,7 @@ enum WidgetText {
 
     // MARK: 위젯 본문
 
-    static func lines(for s: WorkdaySnapshot) -> [TerminalLine] {
+    static func lines(for s: WorkdaySnapshot, settings: WorkSettings = .default) -> [TerminalLine] {
         func line(_ spans: TextSpan...) -> TerminalLine { TerminalLine(spans: spans) }
         func cmd(_ text: String) -> TerminalLine {
             line(TextSpan(text: "$ ", style: .prompt), TextSpan(text: text, style: .command))
@@ -83,6 +84,25 @@ enum WidgetText {
         let inOut = "in \(clock(s.clockIn)) → out \(clock(s.clockOut))"
 
         switch s.phase {
+        case .beforeLunch:
+            return [
+                cmd("npm install 점심"),
+                line(TextSpan(text: "installing... ", style: .output),
+                     TextSpan(text: remainingLong(s.remaining), style: .accent),
+                     TextSpan(text: " left", style: .output)),
+                out(progressBar(s.progress)),
+                out(inOut),
+                out("# 점심 \(clock(s.lunchStart)) · 퇴근까지 \(remainingShort(s.remainingToClockOut))", .comment),
+            ]
+        case .lunch:
+            return [
+                cmd("sleep 점심"),
+                line(TextSpan(text: "점심 끝까지 ", style: .output),
+                     TextSpan(text: remainingLong(s.remaining), style: .accent)),
+                out(progressBar(s.progress)),
+                out(inOut),
+                out("# 지금은 밥이 P0 입니다", .comment),
+            ]
         case .working:
             return [
                 cmd("sudo 퇴근 --force"),
@@ -91,7 +111,7 @@ enum WidgetText {
                      TextSpan(text: " left", style: .output)),
                 out(progressBar(s.progress)),
                 out(inOut),
-                out(comment(for: s), .comment),
+                out(comment(for: s, lunchEnabled: settings.lunchEnabled), .comment),
             ]
         case .almostDone:
             return [
@@ -110,12 +130,14 @@ enum WidgetText {
             if s.overtime >= 60 { result.append(out("# 야근 중 \(overtime(s.overtime))", .comment)) }
             return result
         case .waiting:
-            return [
-                cmd("whoami"),
-                out("아직 출근 전인 사람"),
-                out(String(format: "# waiting for first unlock after %02d:00...",
-                           WorkRules.earliestClockInHour), .comment),
-            ]
+            // 고정 모드는 목표(출근 시각)가 있다. 유동 모드는 earliestStart 이후 첫 잠금 해제를 기다린다.
+            let last: TerminalLine
+            if let target = s.target {
+                last = out("# 출근 \(clock(target)) 까지 \(remainingShort(s.remaining))", .comment)
+            } else {
+                last = out("# waiting for first unlock after \(settings.earliestStart.string)...", .comment)
+            }
+            return [cmd("whoami"), out("아직 출근 전인 사람"), last]
         }
     }
 
@@ -123,21 +145,65 @@ enum WidgetText {
 
     static func menuBarTitle(for s: WorkdaySnapshot) -> String {
         switch s.phase {
+        case .waiting:
+            return "출근 전"
+        case .beforeLunch:
+            return "점심까지 \(remainingShort(s.remaining))"
+        case .lunch:
+            return "점심 끝까지 \(remainingShort(s.remaining))"
         case .working, .almostDone:
             return "\(clock(s.clockOut))까지 \(remainingShort(s.remaining))"
         case .done:
             return s.overtime >= 60 ? "퇴근! +\(Int(s.overtime) / 60)m" : "퇴근!"
-        case .waiting:
-            return "출근 전"
         }
     }
 
-    static func clockInMenuTitle(for s: WorkdaySnapshot) -> String {
-        s.phase == .waiting || s.clockIn == nil ? "출근 기록 없음" : "출근 \(clock(s.clockIn))"
+    // MARK: 말풍선 (docs/spec.md 5-2절)
+
+    /// 분 단위 올림 (0초 초과 → 최소 1분, 60초 → 1분, 61초 → 2분).
+    static func ceilMinutes(_ seconds: TimeInterval) -> Int {
+        max(1, Int((max(0, seconds) / 60).rounded(.up)))
     }
 
-    /// waiting 이면 nil (항목을 표시하지 않는다).
+    /// 말풍선 한 줄 문구.
+    static func bubbleText(for s: WorkdaySnapshot) -> String {
+        let minutes = ceilMinutes(s.remaining)
+        switch s.phase {
+        case .waiting:
+            return s.target == nil ? "출근 전…" : "출근 \(minutes)분 전"   // 유동 / 고정
+        case .beforeLunch: return "점심 \(minutes)분 전"
+        case .lunch: return "점심 끝 \(minutes)분 전"
+        case .working: return "퇴근 \(minutes)분 전"
+        case .almostDone: return "퇴근 \(minutes)분 전!"
+        case .done:
+            return s.overtime >= 60 ? "퇴근하세요! +\(Int(s.overtime) / 60)분" : "퇴근하세요!"
+        }
+    }
+
+    // MARK: 메뉴 항목 문구
+
+    static func clockInMenuTitle(for s: WorkdaySnapshot) -> String {
+        s.clockIn == nil ? "출근 기록 없음" : "출근 \(clock(s.clockIn))"
+    }
+
+    /// 출근이 없으면 nil (항목을 표시하지 않는다).
     static func clockOutMenuTitle(for s: WorkdaySnapshot) -> String? {
-        s.phase == .waiting || s.clockOut == nil ? nil : "퇴근 \(clock(s.clockOut))"
+        s.clockIn == nil || s.clockOut == nil ? nil : "퇴근 \(clock(s.clockOut))"
+    }
+
+    /// `lunch.enabled` 일 때만 (설정 기준 — 유효 여부와 무관).
+    static func lunchMenuTitle(for settings: WorkSettings) -> String? {
+        settings.lunchEnabled ? "점심 \(settings.lunchStart.string)–\(settings.lunchEnd.string)" : nil
+    }
+
+    /// 설정 화면 미리보기 한 줄. `출근 08:30 · 점심 11:30–13:00 · 퇴근 17:30`
+    /// 유동 모드에서 오늘 기록이 없으면 `출근 —` (퇴근도 `—`).
+    static func previewLine(settings s: WorkSettings, detectedClockIn: Date?, now: Date,
+                            calendar: Calendar = .current) -> String {
+        let t = DaySchedule.times(settings: s, detectedClockIn: detectedClockIn, now: now, calendar: calendar)
+        var parts = ["출근 \(t.clockIn.map { clock($0) } ?? "—")"]
+        if s.lunchEnabled { parts.append("점심 \(s.lunchStart.string)–\(s.lunchEnd.string)") }
+        parts.append("퇴근 \(t.clockOut.map { clock($0) } ?? "—")")
+        return parts.joined(separator: " · ")
     }
 }

@@ -3,47 +3,60 @@ import XCTest
 
 final class ClockInRulesTests: XCTestCase {
     private let cal = TestCalendar.seoul
+    private let nine = TimeOfDay(9, 0)
     private func d(_ h: Int, _ m: Int, _ s: Int = 0, day: Int = 23) -> Date { TestCalendar.date(h, m, s, day: day) }
 
     // MARK: 규칙 2
 
     func testRule2_unlockAt916_clocksIn916() {
         // 9:16 에 잠금 해제 → 09:16
-        let t = ClockInRules.decide(now: d(9, 16), activation: d(9, 16), isLocked: false, calendar: cal)
+        let t = ClockInRules.decide(now: d(9, 16), activation: d(9, 16), isLocked: false, earliestStart: nine, calendar: cal)
         XCTAssertEqual(t, d(9, 16))
     }
 
     func testRule2_usedSince840_clocksInAtNine() {
         // 8:40 에 잠금 해제하고 9시까지 계속 사용 → 09:00
-        let t = ClockInRules.decide(now: d(9, 0), activation: d(8, 40), isLocked: false, calendar: cal)
+        let t = ClockInRules.decide(now: d(9, 0), activation: d(8, 40), isLocked: false, earliestStart: nine, calendar: cal)
         XCTAssertEqual(t, d(9, 0))
     }
 
     func testRule2_lockedAndReunlockedAt920_clocksIn920() {
         // 8:40 에 쓰다가 잠그고 9:20 에 다시 해제 → 09:20 (활성화 시각이 9:20 으로 갱신됨)
-        let t = ClockInRules.decide(now: d(9, 20), activation: d(9, 20), isLocked: false, calendar: cal)
+        let t = ClockInRules.decide(now: d(9, 20), activation: d(9, 20), isLocked: false, earliestStart: nine, calendar: cal)
         XCTAssertEqual(t, d(9, 20))
     }
 
     func testRule2_activationInFutureIsClampedToNow() {
-        let t = ClockInRules.decide(now: d(9, 5), activation: d(9, 30), isLocked: false, calendar: cal)
+        let t = ClockInRules.decide(now: d(9, 5), activation: d(9, 30), isLocked: false, earliestStart: nine, calendar: cal)
         XCTAssertEqual(t, d(9, 5))
+    }
+
+    func testRule2_customEarliestStart() {
+        // earliestStart 8:00 — 8:30 에 처음 켜면 08:30, 7:50 부터 쓰고 있었으면 08:00
+        let eight = TimeOfDay(8, 0)
+        XCTAssertEqual(ClockInRules.decide(now: d(8, 30), activation: d(8, 30), isLocked: false, earliestStart: eight, calendar: cal), d(8, 30))
+        XCTAssertEqual(ClockInRules.decide(now: d(8, 0), activation: d(7, 50), isLocked: false, earliestStart: eight, calendar: cal), d(8, 0))
+        XCTAssertNil(ClockInRules.decide(now: d(7, 59, 59), activation: d(7, 50), isLocked: false, earliestStart: eight, calendar: cal))
+        // earliestStart 10:30 — 10:29 엔 기록하지 않고 11:00 에 처음 켜면 11:00
+        let late = TimeOfDay(10, 30)
+        XCTAssertNil(ClockInRules.decide(now: d(10, 29), activation: d(9, 0), isLocked: false, earliestStart: late, calendar: cal))
+        XCTAssertEqual(ClockInRules.decide(now: d(11, 0), activation: d(11, 0), isLocked: false, earliestStart: late, calendar: cal), d(11, 0))
     }
 
     // MARK: 규칙 3·4
 
     func testRule3_beforeNine_noRecord() {
-        XCTAssertNil(ClockInRules.decide(now: d(8, 59, 59), activation: d(8, 40), isLocked: false, calendar: cal))
-        XCTAssertNil(ClockInRules.decide(now: d(0, 0, 0), activation: d(0, 0), isLocked: false, calendar: cal))
+        XCTAssertNil(ClockInRules.decide(now: d(8, 59, 59), activation: d(8, 40), isLocked: false, earliestStart: nine, calendar: cal))
+        XCTAssertNil(ClockInRules.decide(now: d(0, 0, 0), activation: d(0, 0), isLocked: false, earliestStart: nine, calendar: cal))
     }
 
     func testRule3_exactlyNine_isAllowed() {
-        XCTAssertEqual(ClockInRules.decide(now: d(9, 0), activation: d(8, 0), isLocked: false, calendar: cal), d(9, 0))
+        XCTAssertEqual(ClockInRules.decide(now: d(9, 0), activation: d(8, 0), isLocked: false, earliestStart: nine, calendar: cal), d(9, 0))
     }
 
     func testRule4_locked_noRecord() {
-        XCTAssertNil(ClockInRules.decide(now: d(9, 30), activation: d(9, 16), isLocked: true, calendar: cal))
-        XCTAssertNil(ClockInRules.decide(now: d(14, 0), activation: d(3, 0), isLocked: true, calendar: cal))
+        XCTAssertNil(ClockInRules.decide(now: d(9, 30), activation: d(9, 16), isLocked: true, earliestStart: nine, calendar: cal))
+        XCTAssertNil(ClockInRules.decide(now: d(14, 0), activation: d(3, 0), isLocked: true, earliestStart: nine, calendar: cal))
     }
 
     // MARK: 규칙 5
@@ -58,7 +71,7 @@ final class ClockInRulesTests: XCTestCase {
 
     func testRule5_midnightResetsToWaitingSnapshot() {
         let record = ClockInRules.validRecord(d(9, 16, day: 22), now: d(0, 0, 1), calendar: cal)
-        XCTAssertEqual(SnapshotCalculator.make(clockIn: record, now: d(0, 0, 1)).phase, .waiting)
+        XCTAssertEqual(SnapshotCalculator.make(now: d(0, 0, 1), clockIn: record, clockOut: nil).phase, .waiting)
     }
 
     func testDayKey_usesCalendarTimeZone() {

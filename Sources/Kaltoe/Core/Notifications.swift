@@ -10,23 +10,38 @@ struct PlannedNotification: Equatable {
 }
 
 enum NotificationPlanner {
+    static let lunchBody = "점심 시간입니다 — npm install 점심"
     static let warningBody = "퇴근 10분 전 — 지금 배포하면 안 됩니다"
     static let doneBody = "Process finished with exit code 0 — 퇴근하세요"
 
-    /// 출근 시각이 정해졌을 때 예약할 알림. 이미 지난 시각은 제외한다.
-    /// 식별자에 날짜가 들어가므로 같은 날 다시 예약해도 중복되지 않고 덮어쓴다.
-    static func plan(clockIn: Date, now: Date, calendar: Calendar) -> [PlannedNotification] {
+    /// 하루치 알림 식별자 전부 (재예약 때 먼저 취소한다). 식별자에 날짜가 들어가므로 같은 날 같은 알림은 하나뿐.
+    static func identifiers(day: String) -> [String] {
+        ["kaltoe.lunch.\(day)", "kaltoe.clockOut.warning.\(day)", "kaltoe.clockOut.done.\(day)"]
+    }
+
+    /// spec 4절 알림 표. 설정에서 꺼진 것·이미 지난 시각·(점심은) 유효하지 않은 점심은 제외한다.
+    static func plan(times: DaySchedule.Times, settings: WorkSettings, now: Date,
+                     calendar: Calendar) -> [PlannedNotification] {
+        guard let clockIn = times.clockIn, let clockOut = times.clockOut else { return [] }
         let day = ClockInRules.dayKey(clockIn, calendar: calendar)
-        let clockOut = clockIn.addingTimeInterval(WorkRules.workDuration)
-        let warning = PlannedNotification(
-            identifier: "kaltoe.clockOut.warning.\(day)",
-            fireDate: clockOut.addingTimeInterval(-WorkRules.almostDoneThreshold),
-            title: "칼퇴", body: warningBody)
-        let done = PlannedNotification(
-            identifier: "kaltoe.clockOut.done.\(day)",
-            fireDate: clockOut,
-            title: "칼퇴", body: doneBody)
-        return [warning, done].filter { $0.fireDate > now }
+        let ids = identifiers(day: day)
+        var plans: [PlannedNotification] = []
+
+        if settings.notifyLunch,
+           let lunch = SnapshotCalculator.validLunch(clockIn: clockIn, clockOut: clockOut, lunch: times.lunch) {
+            plans.append(PlannedNotification(identifier: ids[0], fireDate: lunch.start,
+                                             title: "칼퇴", body: lunchBody))
+        }
+        if settings.notifyBeforeEnd {
+            plans.append(PlannedNotification(
+                identifier: ids[1], fireDate: clockOut.addingTimeInterval(-WorkRules.almostDoneThreshold),
+                title: "칼퇴", body: warningBody))
+        }
+        if settings.notifyEnd {
+            plans.append(PlannedNotification(identifier: ids[2], fireDate: clockOut,
+                                             title: "칼퇴", body: doneBody))
+        }
+        return plans.filter { $0.fireDate > now }
     }
 }
 
@@ -48,9 +63,11 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    func schedule(_ plans: [PlannedNotification], calendar: Calendar) {
-        guard isAvailable, !plans.isEmpty else { return }
+    /// 그날의 예약을 모두 취소한 뒤 `plans` 를 다시 예약한다.
+    func replace(day: String, with plans: [PlannedNotification], calendar: Calendar) {
+        guard isAvailable else { return }
         let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: NotificationPlanner.identifiers(day: day))
         for plan in plans {
             let content = UNMutableNotificationContent()
             content.title = plan.title

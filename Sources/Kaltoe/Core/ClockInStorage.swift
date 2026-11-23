@@ -26,6 +26,11 @@ struct ClockInStorage {
         return true
     }
 
+    /// "오늘 출근 다시 감지": 그날 기록을 지운다.
+    func remove(for date: Date) {
+        defaults.removeObject(forKey: key(for: date))
+    }
+
     /// 14일 지난 기록 삭제.
     func purge(now: Date) {
         let keys = Array(defaults.dictionaryRepresentation().keys)

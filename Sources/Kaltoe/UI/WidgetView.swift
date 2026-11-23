@@ -25,61 +25,79 @@ final class AnimationClock: ObservableObject {
 
 struct WidgetView: View {
     @ObservedObject var store: WorkdayStore
+    @ObservedObject var settings: SettingsStore
     @ObservedObject var clock: AnimationClock
     var onClose: () -> Void
 
-    static let size = CGSize(width: 320, height: 150)
-    private let mono = Font.system(size: 12, design: .monospaced)
+    /// 기본(100%) 창 크기.
+    static let baseSize = CGSize(width: 320, height: 150)
+    /// 기본 마스코트 표시 크기.
+    static let baseMascot: CGFloat = 56
+
+    /// 글자 크기(px) → 위젯 전체 비율 (`fontSize / 12`).
+    static func ratio(fontSize: Int) -> CGFloat { CGFloat(fontSize) / CGFloat(WorkSettings.baseFontSize) }
+
+    /// `widget.fontSize` 를 적용한 창 크기 (점 단위로 반올림).
+    static func size(fontSize: Int) -> CGSize {
+        let k = ratio(fontSize: fontSize)
+        return CGSize(width: (baseSize.width * k).rounded(), height: (baseSize.height * k).rounded())
+    }
+
+    /// 위젯 전체(글자·줄 간격·여백·상단 바·신호등·마스코트)에 곱하는 비율.
+    private var k: CGFloat { Self.ratio(fontSize: settings.settings.fontSize) }
+    private var mono: Font { .system(size: 12 * k, design: .monospaced) }
 
     var body: some View {
         VStack(spacing: 0) {
             titleBar
             content
         }
-        .frame(width: Self.size.width, height: Self.size.height)
+        .frame(width: Self.size(fontSize: settings.settings.fontSize).width,
+               height: Self.size(fontSize: settings.settings.fontSize).height)
         .background(Color(hex: 0x1B1B1F, opacity: 0.94))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 12 * k, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12 * k, style: .continuous)
+            .strokeBorder(Color.white.opacity(0.08), lineWidth: max(1, k)))
     }
 
     private var titleBar: some View {
         ZStack {
             Color(hex: 0x2A2A30)
             Text("kaltoe — zsh")
-                .font(.system(size: 11))
+                .font(.system(size: 11 * k))
                 .foregroundColor(Color(hex: 0x8E8E93))
-            HStack(spacing: 7) {
-                Circle().fill(Color(hex: 0xFF5F57)).frame(width: 11, height: 11)
-                    .contentShape(Circle().inset(by: -3))
+            HStack(spacing: 7 * k) {
+                Circle().fill(Color(hex: 0xFF5F57)).frame(width: 11 * k, height: 11 * k)
+                    .contentShape(Circle().inset(by: -3 * k))
                     .onTapGesture(perform: onClose)
-                Circle().fill(Color(hex: 0xFEBC2E)).frame(width: 11, height: 11)
-                Circle().fill(Color(hex: 0x28C840)).frame(width: 11, height: 11)
+                Circle().fill(Color(hex: 0xFEBC2E)).frame(width: 11 * k, height: 11 * k)
+                Circle().fill(Color(hex: 0x28C840)).frame(width: 11 * k, height: 11 * k)
                 Spacer()
             }
-            .padding(.leading, 10)
+            .padding(.leading, 10 * k)
         }
-        .frame(height: 26)
+        .frame(height: 26 * k)
     }
 
     private var content: some View {
         let snap = store.snapshot
-        let lines = WidgetText.lines(for: snap)
+        let lines = WidgetText.lines(for: snap, settings: settings.settings)
         let cursorOn = (clock.tick / 3) % 2 == 0
         return ZStack(alignment: .bottomTrailing) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 2 * k) {
                 ForEach(lines.indices, id: \.self) { i in
                     render(lines[i], cursor: i == lines.count - 1 ? cursorOn : nil)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(.horizontal, 12)
-            .padding(.top, 9)
+            .padding(.horizontal, 12 * k)
+            .padding(.top, 9 * k)
 
-            MascotView(phase: snap.phase, tick: clock.tick, jumpStart: clock.jumpStart,
+            MascotView(mood: MascotMood(phase: snap.phase), tick: clock.tick, jumpStart: clock.jumpStart,
                        onTap: { clock.jump() })
-                .padding(.trailing, 8)
-                .padding(.bottom, 6)
+                .scaledMascot(baseSize: Self.baseMascot, ratio: k)
+                .padding(.trailing, 8 * k)
+                .padding(.bottom, 6 * k)
         }
     }
 

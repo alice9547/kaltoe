@@ -4,13 +4,15 @@ enum MascotMood: Equatable {
 }
 
 extension MascotMood {
-    /// 단계 → 기분. 새 단계가 추가되면 여기에 명시한다 (docs/spec.md 6절).
+    /// 단계 → 기분. 새 단계가 추가되면 여기에 명시한다 (docs/spec.md 6절). default 를 두지 않는다.
     init(phase: WorkPhase) {
         switch phase {
         case .waiting: self = .sleep
+        case .beforeLunch: self = .idle
+        case .lunch: self = .eat
+        case .working: self = .idle
         case .almostDone: self = .sparkle
         case .done: self = .dance
-        default: self = .idle
         }
     }
 }
