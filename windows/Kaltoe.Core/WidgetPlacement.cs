@@ -39,17 +39,26 @@ public static class WidgetPlacement
     }
 
     /// 크기가 바뀐 뒤: 왼쪽 위 모서리는 유지하고, 가장 많이 걸친 작업 영역 안으로 밀어 넣는다.
-    /// 작업 영역보다 크면 그 영역의 왼쪽 위에 맞춘다.
+    /// 어느 영역에도 안 걸쳐 있으면(화면 밖) 가장 가까운 영역으로. 작업 영역보다 크면 그 영역의 왼쪽 위에 맞춘다.
     public static (int X, int Y) ClampInto(PixelRect widget, IReadOnlyList<PixelRect> workAreas, PixelRect primaryWorkArea)
     {
         var area = primaryWorkArea;
         long best = -1;
+        long bestDistance = long.MaxValue;
         foreach (var s in workAreas)
         {
             var w = Math.Max(0, Math.Min(widget.Right, s.Right) - Math.Max(widget.X, s.X));
             var h = Math.Max(0, Math.Min(widget.Bottom, s.Bottom) - Math.Max(widget.Y, s.Y));
             long overlap = (long)w * h;
-            if (overlap > best) { best = overlap; area = s; }
+            long dx = Math.Max(0, Math.Max(s.X - widget.Right, widget.X - s.Right));
+            long dy = Math.Max(0, Math.Max(s.Y - widget.Bottom, widget.Y - s.Bottom));
+            var distance = dx * dx + dy * dy;
+            if (overlap > best || (overlap == best && distance < bestDistance))
+            {
+                best = overlap;
+                bestDistance = distance;
+                area = s;
+            }
         }
         var x = Math.Min(widget.X, area.Right - widget.Width);
         var y = Math.Min(widget.Y, area.Bottom - widget.Height);

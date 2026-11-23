@@ -32,14 +32,14 @@ public sealed record DemoScenario(string Name, AppSettings Settings, DateTime? C
     }
 }
 
-/// 실행 인자 해석: `--demo <이름>` `--style terminal|bubble` `--font-size <px>` `--comprehensive on|off`(생략하면 설정 기본값인 켜짐) `--character maltese|orange`.
-public sealed record LaunchOptions(string? DemoName, WidgetStyle? Style, int? FontSize, string? Error, bool? Comprehensive = null, MascotCharacter? Character = null)
+/// 실행 인자 해석: `--demo <이름>` `--style terminal|bubble` `--font-size <px>` `--comprehensive on|off`(생략하면 설정 기본값인 켜짐) `--character maltese|orange` `--settings`(시작하자마자 설정 창을 연다. 데모·실제 모두).
+public sealed record LaunchOptions(string? DemoName, WidgetStyle? Style, int? FontSize, string? Error, bool? Comprehensive = null, MascotCharacter? Character = null, bool OpenSettings = false)
 {
     public bool IsDemo => DemoName is not null;
 
     public static LaunchOptions Parse(IReadOnlyList<string> args)
     {
-        string? demo = null; WidgetStyle? style = null; int? font = null; bool? comprehensive = null; MascotCharacter? character = null;
+        string? demo = null; WidgetStyle? style = null; int? font = null; bool? comprehensive = null; MascotCharacter? character = null; var openSettings = false;
         for (var i = 0; i < args.Count; i++)
         {
             var a = args[i];
@@ -73,6 +73,9 @@ public sealed record LaunchOptions(string? DemoName, WidgetStyle? Style, int? Fo
                     else if (ch == "orange") character = MascotCharacter.Orange;
                     else return new(null, null, null, "--character 에는 maltese|orange 중 하나를 지정하세요");
                     break;
+                case "--settings":
+                    openSettings = true;
+                    break;
                 default:
                     return new(null, null, null, $"알 수 없는 실행 인자: {a}");
             }
@@ -80,6 +83,6 @@ public sealed record LaunchOptions(string? DemoName, WidgetStyle? Style, int? Fo
         // --style / --font-size 는 데모 모드에서만 의미가 있다.
         if (demo is null && (style is not null || font is not null || comprehensive is not null || character is not null))
             return new(null, null, null, "--style, --font-size, --comprehensive, --character 는 --demo 와 함께만 쓸 수 있습니다");
-        return new(demo, style, font, null, comprehensive, character);
+        return new(demo, style, font, null, comprehensive, character, openSettings);
     }
 }

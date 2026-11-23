@@ -31,6 +31,13 @@ internal static class Native
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    /// 포커스를 안 받는 창(WS_EX_NOACTIVATE)에서 WinForms 메뉴를 띄울 때, 메뉴 바깥을 클릭하면 닫히도록 메뉴 창을 앞으로 가져온다.
+    public static bool BringToForeground(IntPtr hwnd) => hwnd != IntPtr.Zero && SetForegroundWindow(hwnd);
+
     /// 포커스를 뺏지 않고 Alt+Tab 목록에 안 뜨게.
     public static void ApplyNoActivateToolWindow(IntPtr hwnd)
     {

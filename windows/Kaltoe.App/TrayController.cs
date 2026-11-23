@@ -15,6 +15,64 @@ internal sealed class TrayActions
     public Action Quit = () => { };
 }
 
+/// 트레이 메뉴와 위젯 오른쪽 클릭 메뉴가 공유하는 WinForms 메뉴 채우기. 항목 목록은 Core 의 WidgetMenu.Build 가 정한다.
+internal static class MenuPresenter
+{
+    public static void Fill(ContextMenuStrip menu, Func<TrayMenuState> state, TrayActions actions)
+    {
+        var st = state();
+        var old = menu.Items.Cast<ToolStripItem>().ToList();
+        menu.Items.Clear();
+        foreach (var item in old) item.Dispose();
+
+        foreach (var e in WidgetMenu.Build(st.Snapshot, st.Settings, st.WidgetVisible, st.LaunchAtLogin, st.IsDemo))
+        {
+            if (e.IsSeparator) { menu.Items.Add(new ToolStripSeparator()); continue; }
+            var checkedNow = e.Checked;
+            ToolStripMenuItem item = e.Action switch
+            {
+                MenuAction.ToggleWidget => new(e.Text, null, (_, _) => actions.ToggleWidget()),
+                MenuAction.OpenSettings => new(e.Text, null, (_, _) => actions.OpenSettings()),
+                MenuAction.RedetectToday => new(e.Text, null, (_, _) => actions.RedetectToday()),
+                MenuAction.ToggleLaunchAtLogin => new(e.Text, null, (_, _) => actions.SetLaunchAtLogin(!checkedNow)),
+                MenuAction.Quit => new(e.Text, null, (_, _) => actions.Quit()),
+                _ => new(e.Text),
+            };
+            item.Enabled = e.Enabled;
+            item.Checked = e.Checked;
+            menu.Items.Add(item);
+        }
+    }
+}
+
+/// 위젯 오른쪽 클릭 메뉴(docs/spec.md 7절 3번). 위젯 창은 WS_EX_NOACTIVATE 라 WPF ContextMenu 는 포커스 문제로 안 닫힐 수 있어 WinForms 메뉴를 쓴다.
+internal sealed class WidgetContextMenu : IDisposable
+{
+    private readonly ContextMenuStrip _menu = new();
+    private readonly TrayActions _actions;
+    private readonly Func<TrayMenuState> _state;
+
+    public WidgetContextMenu(TrayActions actions, Func<TrayMenuState> state)
+    {
+        _actions = actions;
+        _state = state;
+    }
+
+    /// 화면 좌표(물리 픽셀)에 메뉴를 띄운다. UI 스레드에서만 호출한다.
+    public void Show(int screenX, int screenY)
+    {
+        try
+        {
+            MenuPresenter.Fill(_menu, _state, _actions);
+            Native.BringToForeground(_menu.Handle);   // 이게 없으면 바깥을 클릭해도 메뉴가 안 닫힌다
+            _menu.Show(new System.Drawing.Point(screenX, screenY));
+        }
+        catch (Exception ex) { Log.Write($"위젯 메뉴 표시 실패: {ex.Message}"); }
+    }
+
+    public void Dispose() => _menu.Dispose();
+}
+
 /// 트레이 아이콘: 툴팁(spec 4절 한 줄), 왼쪽 클릭 = 위젯 보이기/숨기기, 오른쪽 클릭 = 메뉴, 알림은 풍선.
 internal sealed class TrayController : IDisposable
 {
@@ -97,31 +155,7 @@ internal sealed class TrayController : IDisposable
         catch (Exception ex) { Log.Write($"알림 표시 실패: {ex.Message}"); }
     }
 
-    private void RebuildMenu()
-    {
-        var st = _state();
-        _menu.Items.Clear();
-
-        void Info(string text) => _menu.Items.Add(new ToolStripMenuItem(text) { Enabled = false });
-
-        Info(WidgetText.ClockInMenuTitle(st.Snapshot));
-        if (WidgetText.ClockOutMenuTitle(st.Snapshot) is { } outTitle) Info(outTitle);
-        if (WidgetText.AllowanceMenuTitle(st.Snapshot, st.Settings.Pay) is { } payTitle) Info(payTitle);
-        if (WidgetText.LunchMenuTitle(st.Settings) is { } lunchTitle) Info(lunchTitle);
-        _menu.Items.Add(new ToolStripSeparator());
-
-        _menu.Items.Add(new ToolStripMenuItem(st.WidgetVisible ? "위젯 숨기기" : "위젯 보이기", null, (_, _) => _actions.ToggleWidget()));
-        _menu.Items.Add(new ToolStripMenuItem("설정…", null, (_, _) => _actions.OpenSettings()) { Enabled = !st.IsDemo });
-        if (st.Settings.Mode == WorkMode.Flexible)
-            _menu.Items.Add(new ToolStripMenuItem("오늘 출근 다시 감지", null, (_, _) => _actions.RedetectToday()) { Enabled = !st.IsDemo });
-        _menu.Items.Add(new ToolStripMenuItem("로그인 시 자동 실행", null, (_, _) => _actions.SetLaunchAtLogin(!st.LaunchAtLogin))
-        {
-            Checked = st.LaunchAtLogin,
-            Enabled = !st.IsDemo,
-        });
-        _menu.Items.Add(new ToolStripSeparator());
-        _menu.Items.Add(new ToolStripMenuItem("칼퇴 종료", null, (_, _) => _actions.Quit()));
-    }
+    private void RebuildMenu() => MenuPresenter.Fill(_menu, _state, _actions);
 
     public void Dispose()
     {

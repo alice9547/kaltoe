@@ -39,6 +39,10 @@ dotnet run --project Kaltoe.App
 Kaltoe.exe --demo waiting|beforelunch|lunch|working|almost|done [--style terminal|bubble] [--font-size 8..32] [--comprehensive on|off]
 ```
 
+`--settings` 를 붙이면(데모·실제 모두) 시작하자마자 설정 창을 연다(QA 용).
+
+위젯을 잃어버리지 않게 하는 규칙(docs/spec.md 7절): 시작하면 항상 위젯이 보이고, 실행 중에 exe 를 다시 실행하면 위젯이 보이며 기본 위치(오른쪽 위)로 돌아오고, 위젯을 오른쪽 클릭하면 트레이와 같은 메뉴가 뜬다.
+
 ## 단일 exe 배포
 
 ```sh

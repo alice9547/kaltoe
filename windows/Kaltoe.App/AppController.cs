@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows.Threading;
 using Kaltoe.Core;
 using Microsoft.Win32;
@@ -32,7 +33,9 @@ internal sealed class AppController : ISettingsHost, IDisposable
     private DispatcherTimer? _clockTimer;
     private DispatcherTimer? _animTimer;
     private WorkdaySnapshot _snapshot = WorkdaySnapshot.Waiting(DateTime.Now);
+    private WidgetContextMenu? _widgetMenu;
     private bool _widgetVisible = true;
+    private bool _hideNoticeShown;   // 숨김 안내 풍선은 실행당 한 번
     private bool _disposed;
     private bool _systemEventsHooked;
 
@@ -69,12 +72,14 @@ internal sealed class AppController : ISettingsHost, IDisposable
 
     public void Start()
     {
+        var firstRun = false;
         if (IsDemo)
         {
             _file = new AppFile { Settings = _demo!.Settings };
         }
         else
         {
+            firstRun = !File.Exists(AppPaths.Settings);
             _file = AppFile.Parse(FileIo.ReadOrNull(AppPaths.Settings));
             _days = DayState.Parse(FileIo.ReadOrNull(AppPaths.ClockIn));
             FirstRunSetup();
@@ -85,9 +90,14 @@ internal sealed class AppController : ISettingsHost, IDisposable
             _engine.Start(Now(), isLocked: false);   // 시작 시에는 잠기지 않은 것으로 가정
         }
 
-        _widgetVisible = _file.Widget.Visible;
-        _tray = new TrayController(BuildTrayActions(), () => new TrayMenuState(
-            _snapshot, CurrentSettings, _widgetVisible, LoginItem.IsEnabled(), IsDemo));
+        // 시작하면 항상 보인다(docs/spec.md 7절 1번): 파일에 남아 있는 예전 "숨김" 값은 무시하고, 다시 쓰지도 않는다.
+        _widgetVisible = true;
+        _file = _file with { Widget = _file.Widget with { Visible = true } };
+
+        var actions = BuildTrayActions();
+        TrayMenuState MenuState() => new(_snapshot, CurrentSettings, _widgetVisible, LoginItem.IsEnabled(), IsDemo);
+        _tray = new TrayController(actions, MenuState);
+        _widgetMenu = new WidgetContextMenu(actions, MenuState);
 
         _tray.SetCharacter(CurrentSettings.Widget.Character);
         CreateWidget(PlacementKind.Saved);
@@ -100,6 +110,26 @@ internal sealed class AppController : ISettingsHost, IDisposable
         _clockTimer = new DispatcherTimer(DispatcherPriority.Normal, _dispatcher);
         _clockTimer.Tick += (_, _) => OnClockTick();
         OnClockTick();
+
+        if (firstRun) _tray.ShowBalloon(LostWidgetNotices.Title, LostWidgetNotices.FirstRunBody);
+        if (_options.OpenSettings) OpenSettings(allowDemo: true);   // QA 용 --settings
+    }
+
+    /// 실행 중에 앱이 다시 실행됐다(docs/spec.md 7절 2번): 위젯을 보이게 하고 기본 위치로 옮긴다. UI 스레드에서 호출.
+    public void RevealWidget()
+    {
+        if (_disposed) return;
+        _widgetVisible = true;
+        // 현재 모양의 저장 위치를 지우고(기본 위치) 창을 새로 만든다 — 모양 바꿀 때와 같은 경로.
+        _file = _file with
+        {
+            Widget = CurrentSettings.Widget.Style == WidgetStyle.Bubble
+                ? _file.Widget with { BubbleRight = null, BubbleBottom = null }
+                : _file.Widget with { X = null, Y = null },
+        };
+        CreateWidget(PlacementKind.Saved);
+        _animTimer?.Start();
+        SaveFile();
     }
 
     /// 첫 실행 때 한 번 로그인 시 자동 실행을 켠다(이후엔 메뉴/설정의 값을 따른다).
@@ -128,6 +158,7 @@ internal sealed class AppController : ISettingsHost, IDisposable
             if (!IsDemo) { CaptureWidgetPosition(); SaveFile(); SaveDays(); }
             _settingsWindow?.Close();
             _widget?.CloseWidget();
+            _widgetMenu?.Dispose();
             _tray?.Dispose();
         }
         catch (Exception ex) { Log.Write($"종료 처리 실패: {ex.Message}"); }
@@ -181,6 +212,7 @@ internal sealed class AppController : ISettingsHost, IDisposable
         {
             _widget.Dropped -= OnWidgetDropped;
             _widget.HideRequested -= OnHideRequested;
+            _widget.MenuRequested -= OnWidgetMenuRequested;
             _widget.CloseWidget();
         }
 
@@ -189,12 +221,18 @@ internal sealed class AppController : ISettingsHost, IDisposable
             : new TerminalWidgetWindow(MascotArt.For(s.Character), s.FontSize, request);
         _widget.Dropped += OnWidgetDropped;
         _widget.HideRequested += OnHideRequested;
+        _widget.MenuRequested += OnWidgetMenuRequested;
         _widget.Update(_snapshot, CurrentSettings);
         _widget.Animate(_wall.Elapsed.TotalSeconds);
         if (_widgetVisible) _widget.ShowWidget();
     }
 
     private void OnHideRequested() => SetWidgetVisible(false);
+
+    private void OnWidgetMenuRequested(int screenX, int screenY)
+    {
+        if (!_disposed) _widgetMenu?.Show(screenX, screenY);
+    }
 
     private void OnWidgetDropped()
     {
@@ -216,8 +254,7 @@ internal sealed class AppController : ISettingsHost, IDisposable
 
     private void SetWidgetVisible(bool visible)
     {
-        _widgetVisible = visible;
-        _file = _file with { Widget = _file.Widget with { Visible = visible } };
+        _widgetVisible = visible;   // 숨김은 이 실행 동안만 유지한다 — 파일에는 저장하지 않는다
         if (visible)
         {
             _widget?.Update(_snapshot, CurrentSettings);
@@ -229,6 +266,11 @@ internal sealed class AppController : ISettingsHost, IDisposable
             CaptureWidgetPosition();
             _widget?.HideWidget();
             _animTimer?.Stop();
+            if (!_hideNoticeShown)
+            {
+                _hideNoticeShown = true;
+                _tray?.ShowBalloon(LostWidgetNotices.Title, LostWidgetNotices.HiddenBody);
+            }
         }
         SaveFile();
     }
@@ -244,9 +286,12 @@ internal sealed class AppController : ISettingsHost, IDisposable
         Quit = () => System.Windows.Application.Current.Shutdown(),
     };
 
-    private void OpenSettings()
+    private void OpenSettings() => OpenSettings(allowDemo: false);
+
+    /// 데모에서는 메뉴의 "설정…" 이 꺼져 있지만, 실행 인자 --settings 는 데모에서도 설정 창을 연다(값은 저장되지 않는다).
+    private void OpenSettings(bool allowDemo)
     {
-        if (IsDemo) return;
+        if (IsDemo && !allowDemo) return;
         if (_settingsWindow is not null) { _settingsWindow.Activate(); return; }
         _settingsWindow = new SettingsWindow(this);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;

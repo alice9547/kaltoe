@@ -33,6 +33,8 @@ internal interface IWidgetView
     event Action? Dropped;
     /// 터미널의 빨간 점 클릭.
     event Action? HideRequested;
+    /// 위젯 오른쪽 클릭(화면 좌표, 물리 픽셀).
+    event Action<int, int>? MenuRequested;
     void CloseWidget();
 }
 
@@ -43,6 +45,7 @@ internal abstract class FloatingWindow : Window
     private bool _closing;
 
     public event Action? Dropped;
+    public event Action<int, int>? MenuRequested;
 
     protected FloatingWindow()
     {
@@ -149,6 +152,15 @@ internal abstract class FloatingWindow : Window
         OnMascotClicked();
     }
 
+    protected override void OnMouseRightButtonUp(MouseButtonEventArgs e)
+    {
+        base.OnMouseRightButtonUp(e);
+        if (e.Handled) return;
+        e.Handled = true;
+        var p = PointToScreen(e.GetPosition(this));   // 물리 픽셀
+        MenuRequested?.Invoke((int)Math.Round(p.X), (int)Math.Round(p.Y));
+    }
+
     protected override void OnLostMouseCapture(MouseEventArgs e)
     {
         base.OnLostMouseCapture(e);
@@ -166,10 +178,22 @@ internal abstract class FloatingWindow : Window
             return;   // 왼쪽 버튼이 이미 떼어진 경우
         }
         OnDragEnded();
+        KeepOnScreen();
         RaiseDropped();
     }
 
     protected virtual void OnDragEnded() { }
+
+    /// 드래그를 놓은 뒤 어느 작업 영역에도 충분히 걸쳐 있지 않으면 가장 가까운 작업 영역 안으로 밀어 넣는다(docs/spec.md 7절 4번).
+    private void KeepOnScreen()
+    {
+        if (RectPx is not { } r) return;
+        var areas = Screens.WorkAreas();
+        if (WidgetPlacement.IsOnScreen(r, areas)) return;
+        var pos = WidgetPlacement.ClampInto(r, areas, Screens.Primary());
+        Native.MoveTo(Handle, pos.X, pos.Y);
+        OnDragEnded();   // 말풍선은 anchor(오른쪽 아래)도 새 위치로 갱신
+    }
 
     protected static bool IsInside(DependencyObject? source, DependencyObject? container)
     {
