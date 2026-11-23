@@ -14,6 +14,8 @@ enum MascotPlayer {
         case .eat: return (tick / 4) % 2 == 0 ? "eat1" : "eat2"        // 0.4초
         case .sparkle: return (tick / 3) % 2 == 0 ? "sparkle" : "hop"  // 0.3초
         case .dance: return (tick / 4) % 2 == 0 ? "danceL" : "danceR"  // 0.4초
+        case .angry: return (tick / 3) % 2 == 0 ? "angry1" : "angry2"  // 0.3초 (색종이 없음)
+        case .cry: return (tick / 4) % 2 == 0 ? "cry1" : "cry2"        // 0.4초 (색종이 없음)
         }
     }
 

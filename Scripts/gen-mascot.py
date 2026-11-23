@@ -12,7 +12,7 @@
 import json, os, struct, subprocess, sys, tempfile, zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FRAMES = ["idle", "blink", "breathe", "sleep", "eat1", "eat2", "sparkle", "hop", "danceL", "danceR"]
+FRAMES = ["idle", "blink", "breathe", "sleep", "eat1", "eat2", "sparkle", "hop", "danceL", "danceR", "angry1", "angry2", "cry1", "cry2"]
 ICON_BG = (0x8E, 0xC5, 0xE8)   # 하늘색 — 흰 강아지가 또렷하게 돋보이는 쪽
 HEADER = "생성된 파일 — 직접 고치지 말 것. 원본: shared/mascot.json, 생성: Scripts/gen-mascot.py"
 

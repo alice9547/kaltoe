@@ -5,7 +5,7 @@ public static class MascotData
 {
     public const int Width = 20;
     public const int Height = 20;
-    public static readonly IReadOnlyDictionary<char, uint> Palette = new Dictionary<char, uint> { ['W'] = 0xFFFFFF, ['C'] = 0xE4DFD6, ['G'] = 0xCFC9BE, ['K'] = 0x26212A, ['P'] = 0xFFB3C1, ['T'] = 0xFF8FA3, ['B'] = 0xE8895A, ['b'] = 0xF6B48A, ['O'] = 0xF2DFA8, ['S'] = 0xFFD84D, ['M'] = 0x5B3F45, ['R'] = 0xFF5F57, ['Y'] = 0xFEBC2E, ['N'] = 0x28C840, ['U'] = 0x5AC8FA };
+    public static readonly IReadOnlyDictionary<char, uint> Palette = new Dictionary<char, uint> { ['W'] = 0xFFFFFF, ['C'] = 0xE4DFD6, ['G'] = 0xCFC9BE, ['K'] = 0x26212A, ['P'] = 0xFFB3C1, ['T'] = 0xFF8FA3, ['B'] = 0xE8895A, ['b'] = 0xF6B48A, ['O'] = 0xF2DFA8, ['S'] = 0xFFD84D, ['M'] = 0x5B3F45, ['R'] = 0xFF5F57, ['Y'] = 0xFEBC2E, ['N'] = 0x28C840, ['U'] = 0x5AC8FA, ['L'] = 0xBFE6FA };
     public static readonly IReadOnlyDictionary<string, string[]> Frames = new Dictionary<string, string[]>
     {
         ["idle"] = new[]
@@ -236,6 +236,98 @@ public static class MascotData
             "....CWWWWWWWWCCCC...",
             "....CWWWWWWWWCCWC...",
             "....CWCC..CCWC......",
+            "...................."
+        },
+        ["angry1"] = new[]
+        {
+            "......W..WW..W...R..",
+            ".....CWWWWWWWWC.RRR.",
+            "...CWWWCWWWWCWWWCR..",
+            "..CKKWWWWWWWWWWKKC..",
+            "CWWWWKKWWWWWWKKWWWWC",
+            "CWWWWWWKWCCWKWWWWWWC",
+            "CCWWKKWWWWWWWWKKWWCC",
+            "CWCWKWKKWWWWKKWKWCWC",
+            ".CWWWKKWWWWWWKKWWWC.",
+            ".CWWCWWWKKKKWWWCWWC.",
+            "..CCPPWCWKKWCWPPCC..",
+            ".....CCCWMMWCCC.....",
+            ".....CCCMCCMCCC.....",
+            ".....CWWWWWWWWC.....",
+            ".....CWWWWWWWWCWWC..",
+            ".....CWWWWWWWWCWWC..",
+            ".....CWWWWWWWWCCWC..",
+            ".....CWWWWWWWWC.....",
+            ".....CWCC..CCWC.....",
+            "...................."
+        },
+        ["angry2"] = new[]
+        {
+            ".......W..WW..W..R.R",
+            "......CWWWWWWWWC..R.",
+            "....CWWWCWWWWCWWWR.R",
+            "...CKKWWWWWWWWWWKKC.",
+            ".CWWWWKKWWWWWWKKWWWW",
+            ".CWWWWWWKWCCWKWWWWWW",
+            ".CCWWKKWWWWWWWWKKWWC",
+            ".CWCWKWKKWWWWKKWKWCW",
+            "..CWWWKKWWWWWWKKWWWC",
+            "..CWWCWWWKKKKWWWCWWC",
+            "...CCPPWCWKKWCWPPCC.",
+            "......CCCMMMMCCC....",
+            "......CCCMCCMCCC....",
+            "......CWWWMMWWWC....",
+            "......CWWWWWWWWCWWC.",
+            "......CWWWWWWWWCWWC.",
+            "......CWWWWWWWWCCWC.",
+            "......CWWWWWWWWC....",
+            "......CWCC..CCWC....",
+            "...................."
+        },
+        ["cry1"] = new[]
+        {
+            "......W..WW..W......",
+            ".....CWWWWWWWWC.....",
+            "...CWWWCWWWWCWWWC...",
+            "..CWWWWWWWWWWWWWWC..",
+            "CWWWWWWWWWWWWWWWWWWC",
+            "CWWWWKKWWCCWWKKWWWWC",
+            "CCWWKWWKWWWWKWWKWWCC",
+            "CWCCKWKKWWWWKWKKCCWC",
+            ".CWCWLLWWWWWWLLWCWC.",
+            ".CWWUWWWKKKKWWWUWWC.",
+            "..CCUPWCWKKWCWPUCC..",
+            "....UCCCMMMMCCCU....",
+            "....LCCCMTTMCCCL....",
+            "....UCWWWMMWWWCU....",
+            ".....CWWWWWWWWCWWC..",
+            ".....CWWWWWWWWCWWC..",
+            ".....CWWWWWWWWCCWC..",
+            ".....CWWWWWWWWC.....",
+            ".....CWCC..CCWC.....",
+            "...................."
+        },
+        ["cry2"] = new[]
+        {
+            "....................",
+            "......W..WW..W......",
+            ".....CWWWWWWWWC.....",
+            "...CWWWCWWWWCWWWC...",
+            "..CWWWWWWWWWWWWWWC..",
+            "CWWWWWWWWWWWWWWWWWWC",
+            "CWWWWWWWWCCWWWWWWWWC",
+            "CCWWWWWWWWWWWWWWWWCC",
+            "CWCCKWWKWWWWKWWKCCWC",
+            ".CWCWKKWWWWWWKKWCWC.",
+            ".CWWUWWWKKKKWWWUWWC.",
+            "..CCUPWCWKKWCWPUCC..",
+            "....UCCCWMMWCCCU....",
+            "....UCWCMTTMCWCU....",
+            "....LCWWWMMWWWCLWC..",
+            "....UCWWWWWWWWCUWC..",
+            ".....CWWWWWWWWCCWC..",
+            ".....CWWWWWWWWC.....",
+            ".....CWCC..CCWC.....",
             "...................."
         },
     };
