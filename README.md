@@ -127,7 +127,7 @@ mac/Scripts/build-app.sh --install    # /Applications/Kaltoe.app 으로 설치 �
 
 # 윈도우 (.NET SDK 11 필요) — 자세한 내용은 windows/README.md
 dotnet test windows/Kaltoe.sln
-dotnet publish windows/Kaltoe.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish
+dotnet publish windows/Kaltoe.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
 ```
 
 화면만 빨리 보고 싶으면 데모 모드를 쓰세요. 가짜 데이터가 흐릅니다.

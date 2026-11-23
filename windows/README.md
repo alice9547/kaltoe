@@ -43,7 +43,7 @@ Kaltoe.exe --demo waiting|beforelunch|lunch|working|almost|done [--style termina
 
 ```sh
 dotnet publish windows/Kaltoe.App -c Release -r win-x64 --self-contained true \
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true
+  -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:EnableCompressionInSingleFile=true
 ```
 
 산출물: `windows/Kaltoe.App/bin/Release/net11.0-windows/win-x64/publish/Kaltoe.exe` (런타임 포함, 약 70MB). 처음 실행할 때 네이티브 라이브러리를 임시 폴더에 풀기 때문에 첫 실행이 조금 느리다.

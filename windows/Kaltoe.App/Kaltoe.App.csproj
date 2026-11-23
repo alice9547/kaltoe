@@ -15,7 +15,7 @@
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <Product>칼퇴</Product>
     <AssemblyTitle>칼퇴</AssemblyTitle>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <!-- PerMonitorV2 는 app.manifest 에 둔다(WPF 에는 WinForms 의 ApplicationHighDpiMode 속성이 적용되지 않음). -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
     <!-- 단일 exe 배포(README 의 dotnet publish 명령)에 필요한 기본값 -->
