@@ -117,6 +117,14 @@ extension MascotView {
 }
 
 enum MascotImage {
+    /// 메뉴바 아이콘: 픽셀 캐릭터는 템플릿(검정 윤곽, 16pt), 실사는 얼굴을 잘라 낸 컬러 이미지(템플릿 아님, 18pt).
+    /// `customPhoto` 가 있으면(실사 캐릭터 + 사용자 지정 사진) 그 사진 전체를 정사각 안에 맞춘 컬러 이미지 (docs/spec.md 6-3절).
+    static func menuBarImage(character: MascotCharacter, customPhoto: CustomPhoto? = nil) -> NSImage {
+        guard character.isPhoto else { return menuBarTemplate(pointSize: 16, character: character) }
+        if let customPhoto { return CustomPhotoIcons.menuBarImage(customPhoto, pointSize: 18) }
+        return PhotoMascotImage.menuBarImage(pointSize: 18)
+    }
+
     /// 메뉴바용 템플릿 이미지: 머리 윤곽(검정)에서 눈·코·입은 투명하게 뚫는다.
     static func menuBarTemplate(pointSize: CGFloat, character: MascotCharacter = .maltese) -> NSImage {
         let idle = character.frames["idle"] ?? []

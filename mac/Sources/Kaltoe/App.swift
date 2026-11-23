@@ -12,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var demoTimer: Timer?
     private var iconCancellable: AnyCancellable?
 
+    private struct IconSetting: Equatable { var character: MascotCharacter; var customPhoto: Bool }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         var actions = AppActions()
         actions.isLaunchAtLoginEnabled = { LoginItem.isEnabled }
@@ -57,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settings.update(s, persist: false)
         }
 
-        // 확인용: `--character maltese|orange` 도 저장 없이 이번 실행에만 캐릭터를 바꾼다.
+        // 확인용: `--character maltese|orange|photo` 도 저장 없이 이번 실행에만 캐릭터를 바꾼다.
         if let i = CommandLine.arguments.firstIndex(of: "--character"),
            CommandLine.arguments.indices.contains(i + 1),
            let character = MascotCharacter(rawValue: CommandLine.arguments[i + 1]) {
@@ -75,9 +77,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settings.update(s, persist: false)
         }
 
-        // Finder 앱 아이콘이 캐릭터 설정을 따른다 (시작 때 한 번, 이후 캐릭터가 바뀔 때). 번들이 없으면 아무 일도 안 한다.
-        iconCancellable = settings.$settings.map(\.character).removeDuplicates().sink { character in
-            AppIconSwitcher.apply(character: character)
+        // 확인용: `--custom-photo <경로>` 는 그 사진을 사용자 지정 사진 처리(6-3절)로 돌려 이번 실행에만 쓴다
+        // (파일도 설정도 저장하지 않고, 실사 캐릭터의 사용자 지정 사진을 켠다 — `--character photo` 와 함께 쓴다).
+        if let i = CommandLine.arguments.firstIndex(of: "--custom-photo"), CommandLine.arguments.indices.contains(i + 1) {
+            let path = (CommandLine.arguments[i + 1] as NSString).expandingTildeInPath
+            do {
+                let image = try CustomPhotoProcessor.process(url: URL(fileURLWithPath: path))
+                CustomPhotoStore.shared.useTransient(image)
+                var s = settings.settings
+                s.customPhoto = true
+                settings.update(s, persist: false)
+            } catch {
+                FileHandle.standardError.write(Data("--custom-photo: 사진을 불러오지 못했습니다 (\(path)): \(error)\n".utf8))
+            }
+        }
+
+        // Finder 앱 아이콘이 캐릭터·사용자 지정 사진 설정을 따른다 (시작 때 한 번, 이후 바뀔 때). 번들이 없으면 아무 일도 안 한다.
+        iconCancellable = Publishers.CombineLatest(
+            settings.$settings.map { IconSetting(character: $0.character, customPhoto: $0.customPhoto) }.removeDuplicates(),
+            CustomPhotoStore.shared.$photo
+        ).sink { setting, photo in
+            AppIconSwitcher.apply(character: setting.character, customPhoto: setting.customPhoto ? photo : nil)
         }
 
         // 확인용: 설정 창을 바로 띄운다.

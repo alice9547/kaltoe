@@ -27,6 +27,7 @@ struct WidgetView: View {
     @ObservedObject var store: WorkdayStore
     @ObservedObject var settings: SettingsStore
     @ObservedObject var clock: AnimationClock
+    @ObservedObject var customPhotos: CustomPhotoStore = .shared
     var onClose: () -> Void
 
     /// 기본(100%) 창 크기.
@@ -93,9 +94,10 @@ struct WidgetView: View {
             .padding(.horizontal, 12 * k)
             .padding(.top, 9 * k)
 
-            MascotView(mood: MascotMood.resolve(snap, settings: settings.settings), tick: clock.tick, jumpStart: clock.jumpStart,
-                       onTap: { clock.jump() }, character: settings.settings.character)
-                .scaledMascot(baseSize: Self.baseMascot, ratio: k, character: settings.settings.character)
+            ScaledMascot(mood: MascotMood.resolve(snap, settings: settings.settings), tick: clock.tick, jumpStart: clock.jumpStart,
+                         character: settings.settings.character,
+                         photo: PhotoMascotSource.resolve(customPhoto: settings.settings.customPhoto, photo: customPhotos.photo),
+                         baseSize: Self.baseMascot, ratio: k, onTap: { clock.jump() })
                 .padding(.trailing, 8 * k)
                 .padding(.bottom, 6 * k)
         }

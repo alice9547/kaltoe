@@ -35,6 +35,7 @@ struct BubbleWidgetView: View {
     @ObservedObject var store: WorkdayStore
     @ObservedObject var settings: SettingsStore
     @ObservedObject var clock: AnimationClock
+    @ObservedObject var customPhotos: CustomPhotoStore = .shared
 
     static let baseSize = CGSize(width: 190, height: 120)
     static let baseMascot: CGFloat = 60
@@ -56,6 +57,7 @@ struct BubbleWidgetView: View {
         return ZStack(alignment: .bottomTrailing) {
             ScaledMascot(mood: MascotMood.resolve(snap, settings: settings.settings), tick: clock.tick, jumpStart: clock.jumpStart,
                          outline: true, character: settings.settings.character,
+                         photo: PhotoMascotSource.resolve(customPhoto: settings.settings.customPhoto, photo: customPhotos.photo),
                          baseSize: Self.baseMascot, ratio: k, onTap: { clock.jump() })
                 .padding(.trailing, 2 * k)
                 .padding(.bottom, 2 * k)

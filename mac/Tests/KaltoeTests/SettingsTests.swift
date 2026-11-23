@@ -255,10 +255,11 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(store.update(s), [])
         s.character = .maltese; store.update(s)
         s.character = .orange; store.update(s)
-        XCTAssertEqual(seen, [.orange, .maltese, .orange])
+        s.character = .photo; store.update(s)
+        XCTAssertEqual(seen, [.orange, .maltese, .orange, .photo])
         c.cancel()
-        XCTAssertEqual(defaults.string(forKey: "settings.widget.character"), "orange")
-        XCTAssertEqual(SettingsStore(defaults: defaults).settings.character, .orange)
+        XCTAssertEqual(defaults.string(forKey: "settings.widget.character"), "photo")
+        XCTAssertEqual(SettingsStore(defaults: defaults).settings.character, .photo)
         defaults.set("cat", forKey: "settings.widget.character")
         XCTAssertEqual(SettingsStore(defaults: defaults).settings.character, .maltese, "모르는 값은 기본(말티즈)")
         defaults.removeObject(forKey: "settings.widget.character")
@@ -268,7 +269,47 @@ final class SettingsTests: XCTestCase {
     func testCharacter_rawValuesMatchSpec() {
         XCTAssertEqual(MascotCharacter.maltese.rawValue, "maltese")
         XCTAssertEqual(MascotCharacter.orange.rawValue, "orange")
-        XCTAssertEqual(MascotCharacter.allCases.count, 2)
+        XCTAssertEqual(MascotCharacter.photo.rawValue, "photo")
+        XCTAssertEqual(MascotCharacter.allCases.count, 3)
+    }
+
+    func testCharacter_photoSavedLoadedAndOnlyPhotoIsPhoto() {
+        let store = SettingsStore(defaults: defaults)
+        var s = store.settings; s.character = .photo
+        XCTAssertTrue(store.update(s).isEmpty)
+        XCTAssertEqual(defaults.string(forKey: "settings.widget.character"), "photo")
+        XCTAssertEqual(SettingsStore(defaults: defaults).settings.character, .photo)
+        XCTAssertEqual(MascotCharacter.allCases.filter(\.isPhoto), [.photo])
+        defaults.set("Photo", forKey: "settings.widget.character")
+        XCTAssertEqual(SettingsStore(defaults: defaults).settings.character, .maltese, "대소문자가 다른 모르는 값은 기본(말티즈)")
+    }
+
+    func testCustomPhoto_defaultFalse_savedLoadedAndNotPersistedWhenTransient() {
+        XCTAssertFalse(WorkSettings().customPhoto)
+        let store = SettingsStore(defaults: defaults)
+        XCTAssertFalse(store.settings.customPhoto)
+        var s = store.settings; s.customPhoto = true
+        XCTAssertEqual(store.update(s), [])
+        XCTAssertEqual(defaults.object(forKey: "settings.widget.customPhoto") as? Bool, true)
+        XCTAssertTrue(SettingsStore(defaults: defaults).settings.customPhoto)
+        s.customPhoto = false; store.update(s)
+        XCTAssertFalse(SettingsStore(defaults: defaults).settings.customPhoto)
+        // 확인용 실행 인자(--custom-photo)처럼 저장 없이 켜면 이번 실행에만 적용된다
+        s.customPhoto = true
+        XCTAssertEqual(store.update(s, persist: false), [])
+        XCTAssertTrue(store.settings.customPhoto)
+        XCTAssertFalse(SettingsStore(defaults: defaults).settings.customPhoto)
+        XCTAssertEqual(SettingsValidator.validate(s), [], "사용자 지정 사진 값은 검증에 걸리지 않는다")
+    }
+
+    func testCharacter_photoDoesNotBreakPixelGridAccessors() {
+        // 사진 캐릭터는 격자가 없지만 격자 접근자는 (0 나눗셈 등 없이) 유효한 값을 돌려줘야 한다.
+        let c = MascotCharacter.photo
+        XCTAssertGreaterThan(c.width, 0)
+        XCTAssertGreaterThan(c.height, 0)
+        XCTAssertEqual(c.frames.count, 14)
+        XCTAssertFalse(c.menuBarCutouts.isEmpty)
+        XCTAssertFalse(c.menuBarRows.isEmpty)
     }
 
     func testCharacter_persistFalseDoesNotSave() {

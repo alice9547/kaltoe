@@ -28,7 +28,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         super.init()
 
         if let button = statusItem.button {
-            button.image = MascotImage.menuBarTemplate(pointSize: 16, character: settings.settings.character)
+            button.image = Self.icon(for: settings.settings, photo: CustomPhotoStore.shared.photo)
             button.imagePosition = .imageLeft
         }
         let menu = NSMenu()
@@ -37,10 +37,20 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         applyTitle(store.snapshot)
         cancellable = store.$snapshot.sink { [weak self] snap in self?.applyTitle(snap) }
-        // 캐릭터를 바꾸면 메뉴바 아이콘도 즉시 바꾼다.
-        characterCancellable = settings.$settings.map(\.character).removeDuplicates().sink { [weak self] character in
-            self?.statusItem.button?.image = MascotImage.menuBarTemplate(pointSize: 16, character: character)
+        // 캐릭터나 사용자 지정 사진이 바뀌면 메뉴바 아이콘도 즉시 바꾼다.
+        let key = settings.$settings.map { IconKey(character: $0.character, customPhoto: $0.customPhoto) }.removeDuplicates()
+        characterCancellable = Publishers.CombineLatest(key, CustomPhotoStore.shared.$photo).sink { [weak self] key, photo in
+            let image = key.character.isPhoto && key.customPhoto && photo != nil
+                ? MascotImage.menuBarImage(character: key.character, customPhoto: photo)
+                : MascotImage.menuBarImage(character: key.character)
+            self?.statusItem.button?.image = image
         }
+    }
+
+    private struct IconKey: Equatable { var character: MascotCharacter; var customPhoto: Bool }
+
+    private static func icon(for s: WorkSettings, photo: CustomPhoto?) -> NSImage {
+        MascotImage.menuBarImage(character: s.character, customPhoto: s.customPhoto ? photo : nil)
     }
 
     deinit { NSStatusBar.system.removeStatusItem(statusItem) }

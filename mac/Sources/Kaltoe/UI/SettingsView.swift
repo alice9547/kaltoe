@@ -1,5 +1,6 @@
 // 설정 화면 (docs/spec.md 5절). 값이 유효하면 바꾸는 즉시 저장·반영, 아니면 빨간 글씨로 이유를 보이고 저장하지 않는다.
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var store: WorkdayStore          // 미리보기가 매초 따라가도록
@@ -7,6 +8,9 @@ struct SettingsView: View {
     let actions: AppActions
     /// 오늘 저장된 유동 모드 출근 기록 (미리보기용).
     let detectedClockIn: () -> Date?
+    /// 사진 항목이 나타나거나 사라져 내용 높이가 바뀌면 창이 크기를 다시 맞추도록 알린다.
+    let onLayoutChange: () -> Void
+    @ObservedObject private var photos: CustomPhotoStore
 
     @State private var draft: WorkSettings
     @State private var errors: [SettingsError] = []
@@ -16,9 +20,15 @@ struct SettingsView: View {
     @State private var fontTextError: SettingsError?
     @State private var wageText: String
     @State private var wageTextError: SettingsError?
+    /// 사진 고르기에 실패했을 때만 켜진다 (이전 사진은 그대로 유지).
+    @State private var photoFailed = false
+    @State private var photoBusy = false
 
     init(store: WorkdayStore, settingsStore: SettingsStore, actions: AppActions,
-         detectedClockIn: @escaping () -> Date?) {
+         detectedClockIn: @escaping () -> Date?, photos: CustomPhotoStore = .shared,
+         onLayoutChange: @escaping () -> Void = {}) {
+        self.photos = photos
+        self.onLayoutChange = onLayoutChange
         self.store = store
         self.settingsStore = settingsStore
         self.actions = actions
@@ -103,11 +113,13 @@ struct SettingsView: View {
                     Picker("", selection: $draft.character) {
                         Text("말티즈").tag(MascotCharacter.maltese)
                         Text("주황이").tag(MascotCharacter.orange)
+                        Text("사진").tag(MascotCharacter.photo)
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
-                    .frame(width: 160)
+                    .frame(width: 270)
                 }
+                if draft.character == .photo { photoRow }
                 row("글자 크기") {
                     TextField("", text: $fontText)
                         .textFieldStyle(.roundedBorder)
@@ -140,6 +152,71 @@ struct SettingsView: View {
         .onChange(of: draft) { _, new in
             errors = settingsStore.update(new)   // 유효하면 저장·반영, 아니면 오류만 돌려받음
         }
+        .onChange(of: draft.character) { _, _ in
+            photoFailed = false
+            DispatchQueue.main.async(execute: onLayoutChange)   // 사진 항목이 나타나거나 사라지면 창 높이를 다시 맞춘다
+        }
+        .onChange(of: photoFailed) { _, _ in DispatchQueue.main.async(execute: onLayoutChange) }
+    }
+
+    // MARK: 사진 (docs/spec.md 6-3절)
+
+    /// 사용 중인 사진: 사용자 지정 사진이 켜져 있고 파일이 있으면 그것, 아니면 내장 사진.
+    private var currentPhoto: PhotoMascotSource {
+        PhotoMascotSource.resolve(customPhoto: draft.customPhoto, photo: photos.photo)
+    }
+
+    private var photoRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                Color.clear.frame(width: 90, height: 1)
+                Image(nsImage: currentPhoto.image)
+                    .resizable().interpolation(.high).scaledToFit()
+                    .frame(width: 44, height: 44)
+                    .padding(2)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.15)))
+                Button("사진 고르기…") { choosePhoto() }.disabled(photoBusy)
+                Button("기본 사진으로") { resetPhoto() }.disabled(photos.photo == nil || photoBusy)
+                if photoBusy { ProgressView().controlSize(.small) }
+                Spacer(minLength: 0)
+            }
+            if photoFailed {
+                Text("사진을 불러오지 못했습니다").font(.system(size: 12)).foregroundColor(.red)
+                    .padding(.leading, 100)
+            }
+        }
+    }
+
+    private func choosePhoto() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .heic, .bmp, .gif]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "위젯에 쓸 사진을 고르세요"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        photoBusy = true
+        let store = photos
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Result { try CustomPhotoProcessor.process(url: url) }
+            DispatchQueue.main.async {
+                defer { photoBusy = false }
+                switch result {
+                case .success(let image):
+                    do {
+                        try store.install(image)
+                        photoFailed = false
+                        draft.customPhoto = true          // 저장·반영은 onChange(draft) 가 한다
+                    } catch { photoFailed = true }
+                case .failure: photoFailed = true         // 이전 사진 유지
+                }
+            }
+        }
+    }
+
+    private func resetPhoto() {
+        photos.remove()
+        photoFailed = false
+        draft.customPhoto = false
     }
 
     // MARK: 글자 크기 입력

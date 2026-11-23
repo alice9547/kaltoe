@@ -65,6 +65,8 @@ struct WorkSettings: Equatable {
     var widgetStyle: WidgetStyle = .terminal
     /// 마스코트 캐릭터 (docs/spec.md 6-1절). 위젯·메뉴바 아이콘에 즉시 반영된다.
     var character: MascotCharacter = .maltese
+    /// 사용자 지정 사진을 쓰는지 (docs/spec.md 6-3절). 사진 파일이 없거나 깨졌으면 false 처럼 동작한다(내장 사진).
+    var customPhoto = false
     /// 포괄임금제 여부(기본 켜짐). 켜면 연장수당을 0원으로 표시한다.
     var comprehensivePay = true
     /// 연장수당 단가(원). nil 이면 최저시급(시간당 10320원)으로 계산한다.
@@ -160,6 +162,7 @@ enum SettingsKey {
     static let fontSize = prefix + "widget.fontSize"
     static let widgetStyle = prefix + "widget.style"
     static let character = prefix + "widget.character"
+    static let customPhoto = prefix + "widget.customPhoto"
     static let comprehensivePay = prefix + "pay.comprehensive"
     static let rateAmount = prefix + "pay.rateAmount"
     static let rateUnit = prefix + "pay.rateUnit"
@@ -210,6 +213,7 @@ final class SettingsStore: ObservableObject {
         s.notifyEnd = flag(SettingsKey.notifyEnd, s.notifyEnd)
         if let v = d.object(forKey: SettingsKey.fontSize) as? Int { s.fontSize = v }
         s.character = d.string(forKey: SettingsKey.character).flatMap(MascotCharacter.init(rawValue:)) ?? s.character
+        s.customPhoto = flag(SettingsKey.customPhoto, s.customPhoto)
         s.comprehensivePay = flag(SettingsKey.comprehensivePay, s.comprehensivePay)
         s.rateAmount = d.object(forKey: SettingsKey.rateAmount) as? Int
         s.rateUnit = d.string(forKey: SettingsKey.rateUnit).flatMap(PayRateUnit.init(rawValue:)) ?? s.rateUnit
@@ -248,6 +252,7 @@ final class SettingsStore: ObservableObject {
         d.set(s.fontSize, forKey: SettingsKey.fontSize)
         d.set(s.widgetStyle.rawValue, forKey: SettingsKey.widgetStyle)
         d.set(s.character.rawValue, forKey: SettingsKey.character)
+        d.set(s.customPhoto, forKey: SettingsKey.customPhoto)
         d.set(s.comprehensivePay, forKey: SettingsKey.comprehensivePay)
         if let r = s.rateAmount { d.set(r, forKey: SettingsKey.rateAmount) } else { d.removeObject(forKey: SettingsKey.rateAmount) }
         d.set(s.rateUnit.rawValue, forKey: SettingsKey.rateUnit)

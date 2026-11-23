@@ -23,7 +23,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         if !window.isVisible {
             // 열 때마다 저장된 값으로 다시 시작한다 (열려 있던 임시 입력이 남지 않게).
             let hosting = NSHostingView(rootView: SettingsView(
-                store: store, settingsStore: settingsStore, actions: actions, detectedClockIn: detectedClockIn))
+                store: store, settingsStore: settingsStore, actions: actions, detectedClockIn: detectedClockIn,
+                onLayoutChange: { [weak self] in self?.fitContent() }))
             window.contentView = hosting
             window.setContentSize(hosting.fittingSize)
             window.center()
@@ -32,6 +33,18 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()   // 활성화가 거절돼도(다른 앱이 앞일 때) 창은 맨 앞으로
+    }
+
+    /// 내용 높이가 바뀌었으면(사진 항목이 나타나거나 사라짐) 창 위쪽 모서리를 유지한 채 높이를 맞춘다.
+    private func fitContent() {
+        guard let window, let hosting = window.contentView else { return }
+        let target = hosting.fittingSize
+        guard abs(target.height - window.contentLayoutRect.height) > 0.5 else { return }
+        var frame = window.frame
+        let newFrame = window.frameRect(forContentRect: NSRect(origin: .zero, size: NSSize(width: window.contentLayoutRect.width, height: target.height)))
+        frame.origin.y += frame.height - newFrame.height
+        frame.size.height = newFrame.height
+        window.setFrame(frame, display: true, animate: false)
     }
 
     private func makeWindow() -> NSWindow {
