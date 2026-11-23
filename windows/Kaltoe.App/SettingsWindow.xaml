@@ -4,18 +4,19 @@
         Title="칼퇴 설정"
         Width="440" SizeToContent="Height"
         ResizeMode="CanMinimize"
-        WindowStartupLocation="CenterScreen"
+        WindowStartupLocation="Manual"
         ShowInTaskbar="True"
         FontFamily="Segoe UI, Malgun Gothic" FontSize="13"
+        Left="0" Top="0"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
     <Window.Resources>
         <Style TargetType="GroupBox">
-            <Setter Property="Margin" Value="0,0,0,10" />
-            <Setter Property="Padding" Value="8,6,8,8" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="Padding" Value="6,3,6,5" />
         </Style>
         <Style TargetType="TextBox">
             <Setter Property="Width" Value="64" />
-            <Setter Property="Padding" Value="3,2" />
+            <Setter Property="Padding" Value="3,1" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Margin" Value="6,0,0,0" />
         </Style>
@@ -24,12 +25,19 @@
         </Style>
     </Window.Resources>
 
-    <StackPanel Margin="16">
+    <!-- 화면이 낮으면(1024x768, 배율 150% 노트북) 세로 스크롤. 창 높이 상한은 SettingsWindow.xaml.cs 가 작업 영역 기준으로 정한다. -->
+    <Grid>
+    <Grid.RowDefinitions>
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="12,10,6,10">
         <GroupBox Header="출근 방식">
             <StackPanel>
-                <RadioButton x:Name="RbFlexible" Content="유동 (처음 켠 시각)" GroupName="Mode" Margin="0,0,0,4" />
-                <StackPanel x:Name="FlexiblePanel" Margin="22,0,0,8">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <RadioButton x:Name="RbFlexible" Content="유동 (처음 켠 시각)" GroupName="Mode" Margin="0,0,0,2" />
+                <StackPanel x:Name="FlexiblePanel" Margin="22,0,0,4">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                         <TextBlock Style="{StaticResource Label}" Text="출근 인정 시작" Width="90" />
                         <TextBox x:Name="TbEarliest" Margin="0" />
                     </StackPanel>
@@ -41,15 +49,13 @@
                         <TextBlock Style="{StaticResource Label}" Text="분" Margin="4,0,0,0" />
                     </StackPanel>
                 </StackPanel>
-                <RadioButton x:Name="RbFixed" Content="고정 (정해진 시각)" GroupName="Mode" Margin="0,0,0,4" />
+                <RadioButton x:Name="RbFixed" Content="고정 (정해진 시각)" GroupName="Mode" Margin="0,0,0,2" />
                 <StackPanel x:Name="FixedPanel" Margin="22,0,0,0">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource Label}" Text="출근" Width="90" />
                         <TextBox x:Name="TbFixedStart" Margin="0" />
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Style="{StaticResource Label}" Text="퇴근" Width="90" />
-                        <TextBox x:Name="TbFixedEnd" Margin="0" />
+                        <TextBlock Style="{StaticResource Label}" Text="퇴근" Margin="14,0,0,0" />
+                        <TextBox x:Name="TbFixedEnd" />
                     </StackPanel>
                 </StackPanel>
             </StackPanel>
@@ -57,7 +63,7 @@
 
         <GroupBox Header="점심">
             <StackPanel>
-                <CheckBox x:Name="CbLunch" Content="점심 단계 사용" Margin="0,0,0,4" />
+                <CheckBox x:Name="CbLunch" Content="점심 단계 사용" Margin="0,0,0,2" />
                 <StackPanel x:Name="LunchPanel" Orientation="Horizontal" Margin="22,0,0,0">
                     <TextBlock Style="{StaticResource Label}" Text="시작" />
                     <TextBox x:Name="TbLunchStart" />
@@ -68,21 +74,21 @@
         </GroupBox>
 
         <GroupBox Header="알림">
-            <StackPanel>
-                <CheckBox x:Name="CbNotifyLunch" Content="점심 시작" Margin="0,0,0,2" />
-                <CheckBox x:Name="CbNotifyBeforeEnd" Content="퇴근 10분 전" Margin="0,0,0,2" />
+            <StackPanel Orientation="Horizontal">
+                <CheckBox x:Name="CbNotifyLunch" Content="점심 시작" Margin="0,0,16,0" />
+                <CheckBox x:Name="CbNotifyBeforeEnd" Content="퇴근 10분 전" Margin="0,0,16,0" />
                 <CheckBox x:Name="CbNotifyEnd" Content="퇴근 정각" />
             </StackPanel>
         </GroupBox>
 
         <GroupBox Header="위젯">
             <StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <TextBlock Style="{StaticResource Label}" Text="위젯 모양" Width="90" />
                     <RadioButton x:Name="RbTerminal" Content="터미널" GroupName="Style" Margin="0,0,16,0" VerticalAlignment="Center" />
                     <RadioButton x:Name="RbBubble" Content="말풍선" GroupName="Style" VerticalAlignment="Center" />
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <TextBlock Style="{StaticResource Label}" Text="캐릭터" Width="90" />
                     <RadioButton x:Name="RbMaltese" Content="말티즈" GroupName="Character" Margin="0,0,16,0" VerticalAlignment="Center" />
                     <RadioButton x:Name="RbOrange" Content="주황이" GroupName="Character" VerticalAlignment="Center" />
@@ -101,8 +107,8 @@
 
         <GroupBox Header="야근">
             <StackPanel>
-                <CheckBox x:Name="CbComprehensive" Content="포괄임금제" Margin="0,0,0,6" />
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <CheckBox x:Name="CbComprehensive" Content="포괄임금제" Margin="0,0,0,4" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                     <TextBlock Style="{StaticResource Label}" Text="연장수당 단가" Width="90" />
                     <Grid>
                         <TextBox x:Name="TbRate" Width="110" Margin="0" HorizontalContentAlignment="Right" MaxLength="8" />
@@ -119,9 +125,14 @@
             </StackPanel>
         </GroupBox>
 
-        <CheckBox x:Name="CbLaunch" Content="로그인 시 자동 실행" Margin="0,0,0,10" />
+        <CheckBox x:Name="CbLaunch" Content="로그인 시 자동 실행" Margin="0,2,0,4" />
 
-        <TextBlock x:Name="TbPreview" Margin="0,0,0,4" FontFamily="Cascadia Mono, Consolas, Malgun Gothic" />
+    </StackPanel>
+    </ScrollViewer>
+    <!-- 미리보기·오류는 스크롤과 무관하게 항상 아래에 보인다 -->
+    <StackPanel Grid.Row="1" Margin="12,0,12,8">
+        <TextBlock x:Name="TbPreview" Margin="0,0,0,2" FontFamily="Cascadia Mono, Consolas, Malgun Gothic" />
         <TextBlock x:Name="TbError" Foreground="#D32F2F" TextWrapping="Wrap" MinHeight="18" />
     </StackPanel>
+    </Grid>
 </Window>

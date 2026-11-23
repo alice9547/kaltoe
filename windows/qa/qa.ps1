@@ -54,6 +54,12 @@ function MenuWindow($p) {
   foreach ($w in (Windows $p)) { $f = $w.Split('|'); if ($f[6] -like 'WindowsForms10*' -and $f[1] -eq 'True' -and [int]$f[4] -gt 20 -and [int]$f[5] -gt 20) { return @{ X=[int]$f[2]; Y=[int]$f[3]; W=[int]$f[4]; H=[int]$f[5] } } }
   return $null
 }
+# 창 전체가 작업 영역 안에 있는가 (위 Y >= 작업 영역 Y, 아래 <= 작업 영역 아래, 좌우도 동일)
+function InsideWorkArea($r) {
+  $wa = WorkArea
+  return (($r.X -ge $wa.X) -and ($r.Y -ge $wa.Y) -and (($r.X + $r.W) -le $wa.Right) -and (($r.Y + $r.H) -le $wa.Bottom))
+}
+function WorkAreaText($r) { $wa = WorkArea; return "rect=$($r.X),$($r.Y) $($r.W)x$($r.H) workarea=$($wa.X),$($wa.Y) $($wa.Width)x$($wa.Height)" }
 function WorkArea { [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea }
 # 기본 위치 = 주 모니터 작업 영역 오른쪽 위, 여백 16 (100% 배율 기준, 오차 8px)
 function NearDefault($w) {
@@ -216,12 +222,14 @@ $p = Launch @('--demo','working','--settings')
 Dump 'settings-demo' $p; Shot '16-settings-demo'
 $sd = SettingsWin $p
 Check 'settings-arg-opens-window-demo' ($null -ne $sd) "rect=$($sd.X),$($sd.Y) $($sd.W)x$($sd.H)"
+if ($sd) { Check 'settings-window-inside-workarea-demo' (InsideWorkArea $sd) (WorkAreaText $sd) }
 Check 'settings-demo-widget-still-visible' ($null -ne (Widget $p)) ""
 if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }; Start-Sleep -Seconds 2
 $p = Launch @('--settings')
 Dump 'settings-real' $p; Shot '17-settings-real'
 $sr = SettingsWin $p
 Check 'settings-arg-opens-window-real' ($null -ne $sr) "rect=$($sr.X),$($sr.Y) $($sr.W)x$($sr.H)"
+if ($sr) { Check 'settings-window-inside-workarea-real' (InsideWorkArea $sr) (WorkAreaText $sr) }
 Check 'settings-real-widget-still-visible' ($null -ne (Widget $p)) ""
 if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
 

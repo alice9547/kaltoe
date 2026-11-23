@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using Kaltoe.Core;
 
 namespace Kaltoe.App;
@@ -14,6 +15,8 @@ public partial class SettingsWindow : Window
     {
         _host = host;
         InitializeComponent();
+        FitToWorkArea();
+        Loaded += (_, _) => FitToWorkArea(center: true);
         Load(host.CurrentSettings);
 
         foreach (var tb in new[] { TbEarliest, TbHours, TbMinutes, TbFixedStart, TbFixedEnd, TbLunchStart, TbLunchEnd, TbFontSize, TbRate })
@@ -29,6 +32,31 @@ public partial class SettingsWindow : Window
         CbLaunch.Unchecked += (_, _) => OnLaunchChanged();
         BtnFontUp.Click += (_, _) => StepFont(+1);
         BtnFontDown.Click += (_, _) => StepFont(-1);
+    }
+
+    /// 화면에 여유를 남길 세로 여백(DIP, 위·아래 합계).
+    private const double ScreenMargin = 32;
+
+    /// 창 높이를 '내용 높이'와 '작업 영역 높이 - 여백' 중 작은 값으로 제한하고(넘치면 ScrollViewer 가 스크롤),
+    /// 작업 영역 안 가운데에 둔다(위쪽이 작업 영역 밖으로 나가지 않게). 1024x768, 배율 150% 노트북 대응.
+    /// center 가 거짓이면 HWND 가 생기기 전이라 크기를 모르므로 상한과 작업 영역 왼쪽 위만 정한다.
+    private void FitToWorkArea(bool center = false)
+    {
+        var wa = Screens.Primary();   // 물리 픽셀
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var sx = dpi.DpiScaleX;
+        var sy = dpi.DpiScaleY;
+        MaxHeight = Math.Max(200, wa.Height / sy - ScreenMargin);
+        var left = wa.X / sx;
+        var top = wa.Y / sy;
+        if (center)
+        {
+            UpdateLayout();   // 새 MaxHeight 로 높이를 다시 잰다
+            left += Math.Max(0, (wa.Width / sx - ActualWidth) / 2);
+            top += Math.Max(0, (wa.Height / sy - ActualHeight) / 2);
+        }
+        Left = left;
+        Top = top;
     }
 
     private void Load(AppSettings s)
