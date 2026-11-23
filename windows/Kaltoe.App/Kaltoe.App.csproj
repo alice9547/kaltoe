@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net11.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Kaltoe.App</RootNamespace>
+    <AssemblyName>Kaltoe</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <Product>칼퇴</Product>
+    <AssemblyTitle>칼퇴</AssemblyTitle>
+    <Version>1.0.0</Version>
+    <!-- PerMonitorV2 는 app.manifest 에 둔다(WPF 에는 WinForms 의 ApplicationHighDpiMode 속성이 적용되지 않음). -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+    <!-- 단일 exe 배포(README 의 dotnet publish 명령)에 필요한 기본값 -->
+    <DebugType>none</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="Exists('Assets\app.ico')">
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- WPF 와 WinForms 를 같이 쓰면 암묵적 using 이 같은 이름(Application, Brushes, FontFamily ...)을 중복시킨다. 빼고 필요한 것만 직접 쓴다. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kaltoe.Core\Kaltoe.Core.csproj" />
+  </ItemGroup>
+
+  <!-- 트레이 아이콘: 파일이 없으면(마스코트 작업 전) 빌드는 되고 실행 시 기본 아이콘을 쓴다. -->
+  <ItemGroup Condition="Exists('Assets\tray.ico')">
+    <Resource Include="Assets\tray.ico" />
+  </ItemGroup>
+
+</Project>

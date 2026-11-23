@@ -1,0 +1,102 @@
+<Window x:Class="Kaltoe.App.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="칼퇴 설정"
+        Width="440" SizeToContent="Height"
+        ResizeMode="CanMinimize"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True"
+        FontFamily="Segoe UI, Malgun Gothic" FontSize="13"
+        UseLayoutRounding="True" SnapsToDevicePixels="True">
+    <Window.Resources>
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Padding" Value="8,6,8,8" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Width" Value="64" />
+            <Setter Property="Padding" Value="3,2" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Margin" Value="6,0,0,0" />
+        </Style>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </Window.Resources>
+
+    <StackPanel Margin="16">
+        <GroupBox Header="출근 방식">
+            <StackPanel>
+                <RadioButton x:Name="RbFlexible" Content="유동 (처음 켠 시각)" GroupName="Mode" Margin="0,0,0,4" />
+                <StackPanel x:Name="FlexiblePanel" Margin="22,0,0,8">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock Style="{StaticResource Label}" Text="출근 인정 시작" Width="90" />
+                        <TextBox x:Name="TbEarliest" Margin="0" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Label}" Text="근무 시간" Width="90" />
+                        <TextBox x:Name="TbHours" Width="40" Margin="0" />
+                        <TextBlock Style="{StaticResource Label}" Text="시간" Margin="4,0,0,0" />
+                        <TextBox x:Name="TbMinutes" Width="40" />
+                        <TextBlock Style="{StaticResource Label}" Text="분" Margin="4,0,0,0" />
+                    </StackPanel>
+                </StackPanel>
+                <RadioButton x:Name="RbFixed" Content="고정 (정해진 시각)" GroupName="Mode" Margin="0,0,0,4" />
+                <StackPanel x:Name="FixedPanel" Margin="22,0,0,0">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <TextBlock Style="{StaticResource Label}" Text="출근" Width="90" />
+                        <TextBox x:Name="TbFixedStart" Margin="0" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Label}" Text="퇴근" Width="90" />
+                        <TextBox x:Name="TbFixedEnd" Margin="0" />
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox Header="점심">
+            <StackPanel>
+                <CheckBox x:Name="CbLunch" Content="점심 단계 사용" Margin="0,0,0,4" />
+                <StackPanel x:Name="LunchPanel" Orientation="Horizontal" Margin="22,0,0,0">
+                    <TextBlock Style="{StaticResource Label}" Text="시작" />
+                    <TextBox x:Name="TbLunchStart" />
+                    <TextBlock Style="{StaticResource Label}" Text="끝" Margin="14,0,0,0" />
+                    <TextBox x:Name="TbLunchEnd" />
+                </StackPanel>
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox Header="알림">
+            <StackPanel>
+                <CheckBox x:Name="CbNotifyLunch" Content="점심 시작" Margin="0,0,0,2" />
+                <CheckBox x:Name="CbNotifyBeforeEnd" Content="퇴근 10분 전" Margin="0,0,0,2" />
+                <CheckBox x:Name="CbNotifyEnd" Content="퇴근 정각" />
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox Header="위젯">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock Style="{StaticResource Label}" Text="위젯 모양" Width="90" />
+                    <RadioButton x:Name="RbTerminal" Content="터미널" GroupName="Style" Margin="0,0,16,0" VerticalAlignment="Center" />
+                    <RadioButton x:Name="RbBubble" Content="말풍선" GroupName="Style" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Style="{StaticResource Label}" Text="글자 크기" Width="90" />
+                    <TextBox x:Name="TbFontSize" Width="48" Margin="0" HorizontalContentAlignment="Right" MaxLength="3" />
+                    <StackPanel Margin="4,0,0,0">
+                        <RepeatButton x:Name="BtnFontUp" Content="▲" Width="22" Height="14" FontSize="7" Padding="0" />
+                        <RepeatButton x:Name="BtnFontDown" Content="▼" Width="22" Height="14" FontSize="7" Padding="0" />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource Label}" Text="px  (8~32)" Margin="6,0,0,0" />
+                </StackPanel>
+            </StackPanel>
+        </GroupBox>
+
+        <CheckBox x:Name="CbLaunch" Content="로그인 시 자동 실행" Margin="0,0,0,10" />
+
+        <TextBlock x:Name="TbPreview" Margin="0,0,0,4" FontFamily="Cascadia Mono, Consolas, Malgun Gothic" />
+        <TextBlock x:Name="TbError" Foreground="#D32F2F" TextWrapping="Wrap" MinHeight="18" />
+    </StackPanel>
+</Window>
