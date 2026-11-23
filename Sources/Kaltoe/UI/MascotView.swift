@@ -1,5 +1,3 @@
-// TODO(conductor): [마스코트↔맥] 메뉴바 아이콘을 MascotData 기반으로 교체 — MenuBarController 가 아직 MascotArt.templateImage 를 부른다(아래 호환 shim 이 MascotImage 로 연결). 호출부를 MascotImage.menuBarTemplate 로 바꾸면 shim 삭제 가능.
-//
 // 하얀 말티즈 픽셀 마스코트. 그림 데이터는 MascotData.swift(생성물, 원본 shared/mascot.json).
 // 재생 규칙은 docs/spec.md 6절.
 import AppKit
@@ -140,7 +138,3 @@ enum MascotImage {
     }
 }
 
-/// 호환 shim — MenuBarController(맥 작업자 소유)가 아직 이 이름을 부른다.
-enum MascotArt {
-    static func templateImage(size: CGFloat = 16) -> NSImage { MascotImage.menuBarTemplate(pointSize: size) }
-}

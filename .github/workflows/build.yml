@@ -1,0 +1,63 @@
+name: build
+
+on:
+  push:
+    branches: [main, windows]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: swift test
+      - name: Build app
+        run: Scripts/build-app.sh
+      - name: Zip
+        run: ditto -c -k --keepParent dist/Kaltoe.app Kaltoe-mac.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kaltoe-mac
+          path: Kaltoe-mac.zip
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '11.0.x'
+      - name: Test
+        run: dotnet test windows/Kaltoe.sln -c Release
+      - name: Publish
+        run: >
+          dotnet publish windows/Kaltoe.App -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -o publish
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path publish/Kaltoe.exe -DestinationPath Kaltoe-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kaltoe-windows
+          path: Kaltoe-windows.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [mac, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${{ github.ref_name }}" Kaltoe-mac.zip Kaltoe-windows.zip
+          --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes
