@@ -45,6 +45,7 @@ internal sealed class AppController : ISettingsHost, IDisposable
             {
                 Style = options.Style ?? WidgetStyle.Terminal,
                 FontSize = options.FontSize ?? WidgetSizing.DefaultFontSize,
+                Character = options.Character ?? MascotCharacter.Maltese,
             };
             _demo = DemoScenario.Create(options.DemoName, DateTime.Today, widget, new PaySettings { Comprehensive = options.Comprehensive ?? new PaySettings().Comprehensive });
         }
@@ -88,6 +89,7 @@ internal sealed class AppController : ISettingsHost, IDisposable
         _tray = new TrayController(BuildTrayActions(), () => new TrayMenuState(
             _snapshot, CurrentSettings, _widgetVisible, LoginItem.IsEnabled(), IsDemo));
 
+        _tray.SetCharacter(CurrentSettings.Widget.Character);
         CreateWidget(PlacementKind.Saved);
         HookSystemEvents();
 
@@ -183,8 +185,8 @@ internal sealed class AppController : ISettingsHost, IDisposable
         }
 
         _widget = s.Style == WidgetStyle.Bubble
-            ? new BubbleWidgetWindow(s.FontSize, request)
-            : new TerminalWidgetWindow(s.FontSize, request);
+            ? new BubbleWidgetWindow(MascotArt.For(s.Character), s.FontSize, request)
+            : new TerminalWidgetWindow(MascotArt.For(s.Character), s.FontSize, request);
         _widget.Dropped += OnWidgetDropped;
         _widget.HideRequested += OnHideRequested;
         _widget.Update(_snapshot, CurrentSettings);
@@ -270,6 +272,7 @@ internal sealed class AppController : ISettingsHost, IDisposable
         var now = Now();
         _engine.UpdateSettings(next, now);
 
+        if (previous.Widget.Character != next.Widget.Character) _tray?.SetCharacter(next.Widget.Character);
         if (previous.Widget != next.Widget)
         {
             // 모양이 바뀌면 그 모양의 저장 위치로, 글자 크기만 바뀌면 왼쪽 위 모서리를 유지한 채 다시 만든다.

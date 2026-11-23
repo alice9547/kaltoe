@@ -18,7 +18,7 @@ public partial class SettingsWindow : Window
 
         foreach (var tb in new[] { TbEarliest, TbHours, TbMinutes, TbFixedStart, TbFixedEnd, TbLunchStart, TbLunchEnd, TbFontSize, TbRate })
             tb.TextChanged += (_, _) => OnChanged();
-        foreach (var rb in new[] { RbFlexible, RbFixed, RbTerminal, RbBubble, RbPerHour, RbPerMinute })
+        foreach (var rb in new[] { RbFlexible, RbFixed, RbTerminal, RbBubble, RbMaltese, RbOrange, RbPerHour, RbPerMinute })
             rb.Checked += (_, _) => OnChanged();
         foreach (var cb in new[] { CbComprehensive, CbLunch, CbNotifyLunch, CbNotifyBeforeEnd, CbNotifyEnd })
         {
@@ -51,6 +51,8 @@ public partial class SettingsWindow : Window
             CbNotifyEnd.IsChecked = s.Notify.End;
             RbTerminal.IsChecked = s.Widget.Style == WidgetStyle.Terminal;
             RbBubble.IsChecked = s.Widget.Style == WidgetStyle.Bubble;
+            RbMaltese.IsChecked = s.Widget.Character == MascotCharacter.Maltese;
+            RbOrange.IsChecked = s.Widget.Character == MascotCharacter.Orange;
             TbFontSize.Text = s.Widget.FontSize.ToString();
             CbComprehensive.IsChecked = s.Pay.Comprehensive;
             TbRate.Text = s.Pay.RateAmount?.ToString() ?? "";
@@ -59,10 +61,28 @@ public partial class SettingsWindow : Window
             RatePlaceholder.Visibility = string.IsNullOrEmpty(TbRate.Text) ? Visibility.Visible : Visibility.Collapsed;
             CbLaunch.IsChecked = _host.LaunchAtLogin;
             UpdateEnabled();
+            UpdateWindowIcon(s.Widget.Character);
             TbPreview.Text = WidgetText.Preview(s, _host.Today, _host.TodayClockIn);
             TbError.Text = "";
         }
         finally { _loading = false; }
+    }
+
+    /// 창 아이콘은 선택한 캐릭터를 따른다. 파일이 없으면 app.ico, 그것도 없으면 아이콘 없이 둔다.
+    private void UpdateWindowIcon(MascotCharacter character)
+    {
+        foreach (var file in new[] { MascotAssets.WindowIconFile(character), MascotAssets.FallbackWindowIconFile })
+        {
+            try
+            {
+                Icon = System.Windows.Media.Imaging.BitmapFrame.Create(new Uri($"pack://application:,,,/Assets/{file}", UriKind.Absolute));
+                return;
+            }
+            catch (Exception ex)
+            {
+                Log.Write($"설정 창 아이콘 로드 실패({file}): {ex.Message}");
+            }
+        }
     }
 
     private void UpdateEnabled()
@@ -107,6 +127,7 @@ public partial class SettingsWindow : Window
             return;
         }
         TbError.Text = "";
+        UpdateWindowIcon(result.Widget.Character);
         TbPreview.Text = WidgetText.Preview(result, _host.Today, _host.TodayClockIn);
         _host.ApplySettings(result);
     }
@@ -161,6 +182,7 @@ public partial class SettingsWindow : Window
             Widget = new WidgetSettings
             {
                 Style = RbBubble.IsChecked == true ? WidgetStyle.Bubble : WidgetStyle.Terminal,
+                Character = RbOrange.IsChecked == true ? MascotCharacter.Orange : MascotCharacter.Maltese,
                 FontSize = fontSize,
             },
             Pay = new PaySettings

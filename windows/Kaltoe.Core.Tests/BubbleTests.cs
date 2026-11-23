@@ -283,3 +283,80 @@ public class LaunchOptionsTests
     [InlineData("--wat")]
     public void Invalid_GivesError(params string[] args) => Assert.NotNull(LaunchOptions.Parse(args).Error);
 }
+
+public class CharacterSettingsTests
+{
+    [Fact]
+    public void Default_IsMaltese() => Assert.Equal(MascotCharacter.Maltese, AppSettings.Default.Widget.Character);
+
+    [Theory]
+    [InlineData(MascotCharacter.Maltese, "maltese")]
+    [InlineData(MascotCharacter.Orange, "orange")]
+    public void Json_UsesLowercaseNames_AndRoundTrips(MascotCharacter c, string name)
+    {
+        var settings = AppSettings.Default with { Widget = new WidgetSettings { Character = c, Style = WidgetStyle.Bubble, FontSize = 16 } };
+        var json = new AppFile { Settings = settings }.ToJson();
+        Assert.Contains($"\"character\": \"{name}\"", json);
+        var back = AppFile.Parse(json).Settings.Widget;
+        Assert.Equal(c, back.Character);
+        Assert.Equal(WidgetStyle.Bubble, back.Style);
+        Assert.Equal(16, back.FontSize);
+    }
+
+    [Fact]
+    public void OldFile_WithoutCharacter_GetsMaltese()
+        => Assert.Equal(MascotCharacter.Maltese, AppFile.Parse("{\"settings\":{\"widget\":{\"fontSize\":14}}}").Settings.Widget.Character);
+
+    [Fact]
+    public void UnknownCharacterName_FallsBackToDefaults()
+        => Assert.Equal(AppFile.Parse(null).Settings, AppFile.Parse("{\"settings\":{\"widget\":{\"character\":\"cat\"}}}").Settings);
+
+    [Theory]
+    [InlineData(MascotCharacter.Maltese)]
+    [InlineData(MascotCharacter.Orange)]
+    public void EveryCharacter_IsValid_InValidator(MascotCharacter c)
+        => Assert.Null(SettingsValidator.Validate(AppSettings.Default with { Widget = new WidgetSettings { Character = c } }));
+
+    [Fact]
+    public void TrayIconFile_PerCharacter_WithFallback()
+    {
+        Assert.Equal("tray.ico", MascotAssets.TrayIconFile(MascotCharacter.Maltese));
+        Assert.Equal("tray-orange.ico", MascotAssets.TrayIconFile(MascotCharacter.Orange));
+        Assert.Equal("tray.ico", MascotAssets.FallbackTrayIconFile);
+    }
+
+    [Fact]
+    public void WindowIconFile_FollowsCharacter()
+    {
+        Assert.Equal("app.ico", MascotAssets.WindowIconFile(MascotCharacter.Orange));
+        Assert.Equal("app-maltese.ico", MascotAssets.WindowIconFile(MascotCharacter.Maltese));
+        Assert.Equal("app.ico", MascotAssets.FallbackWindowIconFile);
+    }
+
+    [Fact]
+    public void Demo_AcceptsCharacter()
+    {
+        var d = DemoScenario.Create("working", T.Day, new WidgetSettings { Character = MascotCharacter.Orange })!;
+        Assert.Equal(MascotCharacter.Orange, d.Settings.Widget.Character);
+    }
+
+    [Fact]
+    public void LaunchOptions_Character()
+    {
+        Assert.Equal(MascotCharacter.Orange, LaunchOptions.Parse(new[] { "--demo", "done", "--character", "Orange" }).Character);
+        Assert.Equal(MascotCharacter.Maltese, LaunchOptions.Parse(new[] { "--demo", "done", "--character", "maltese" }).Character);
+        Assert.Null(LaunchOptions.Parse(new[] { "--demo", "done" }).Character);
+        Assert.NotNull(LaunchOptions.Parse(new[] { "--demo", "done", "--character", "cat" }).Error);
+        Assert.NotNull(LaunchOptions.Parse(new[] { "--demo", "done", "--character" }).Error);
+        Assert.NotNull(LaunchOptions.Parse(new[] { "--character", "orange" }).Error);
+    }
+
+    [Theory]
+    [InlineData(16, 16, 12, 3)]
+    [InlineData(20, 20, 12, 2)]
+    [InlineData(24, 24, 12, 2)]
+    [InlineData(32, 32, 12, 2)]    // 48/32 = 1.5 → 2
+    [InlineData(64, 64, 12, 1)]
+    public void MascotCell_FollowsEachCharactersGrid(int w, int h, int fontSize, int cell)
+        => Assert.Equal(cell, WidgetSizing.MascotCell(w, h, fontSize, WidgetStyle.Terminal));
+}

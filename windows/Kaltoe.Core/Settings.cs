@@ -44,10 +44,16 @@ public sealed record PaySettings
 
 public enum WidgetStyle { Terminal, Bubble }
 
+/// 마스코트 캐릭터 (docs/spec.md 6-1절). maltese = 하얀 말티즈, orange = 주황이.
+public enum MascotCharacter { Maltese, Orange }
+
 public sealed record WidgetSettings
 {
     /// 위젯 모양. 터미널 창 / 말풍선(docs/spec.md 5-2절).
     public WidgetStyle Style { get; init; } = WidgetStyle.Terminal;
+
+    /// 마스코트 캐릭터. 위젯(터미널·말풍선)과 트레이 아이콘이 따라 바뀐다.
+    public MascotCharacter Character { get; init; } = MascotCharacter.Maltese;
 
     /// 위젯 글자 크기(px). 허용 8~32. 위젯 전체 비율 = FontSize / 12.
     public int FontSize { get; init; } = WidgetSizing.DefaultFontSize;
@@ -119,6 +125,17 @@ public static class TimeText
         value = new TimeOnly(h, min);
         return true;
     }
+}
+
+/// 캐릭터별 트레이 아이콘 파일.
+public static class MascotAssets
+{
+    public static string TrayIconFile(MascotCharacter c) => c == MascotCharacter.Orange ? "tray-orange.ico" : "tray.ico";
+    public const string FallbackTrayIconFile = "tray.ico";
+
+    /// 설정 창의 창 아이콘: 주황이 → app.ico(주황이 고정 앱 아이콘), 말티즈 → app-maltese.ico(없으면 app.ico).
+    public static string WindowIconFile(MascotCharacter c) => c == MascotCharacter.Maltese ? "app-maltese.ico" : "app.ico";
+    public const string FallbackWindowIconFile = "app.ico";
 }
 
 /// 위젯 글자 크기 → 전체 비율·창 크기·마스코트 배율 (docs/spec.md 5-1절).

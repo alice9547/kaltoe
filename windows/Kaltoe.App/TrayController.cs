@@ -45,22 +45,40 @@ internal sealed class TrayController : IDisposable
         };
     }
 
-    private System.Drawing.Icon LoadIcon()
+    private System.Drawing.Icon LoadIcon() => LoadIcon(MascotCharacter.Maltese);
+
+    /// 캐릭터별 트레이 아이콘(tray.ico / tray-orange.ico). 없으면 tray.ico, 그것도 없으면 기본 아이콘.
+    private System.Drawing.Icon LoadIcon(MascotCharacter character)
     {
-        try
+        foreach (var file in new[] { MascotAssets.TrayIconFile(character), MascotAssets.FallbackTrayIconFile })
         {
-            var info = System.Windows.Application.GetResourceStream(new Uri("pack://application:,,,/Assets/tray.ico", UriKind.Absolute));
-            if (info?.Stream is { } stream)
+            try
             {
-                using (stream) _ownedIcon = new System.Drawing.Icon(stream);
-                return _ownedIcon;
+                var info = System.Windows.Application.GetResourceStream(new Uri($"pack://application:,,,/Assets/{file}", UriKind.Absolute));
+                if (info?.Stream is not { } stream) continue;
+                using (stream)
+                {
+                    var icon = new System.Drawing.Icon(stream);
+                    _ownedIcon = icon;   // 이전 아이콘은 호출한 쪽(SetCharacter)이 교체한 뒤에 해제한다
+                    return icon;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Write($"트레이 아이콘 로드 실패({file}): {ex.Message}");
             }
         }
-        catch (Exception ex)
-        {
-            Log.Write($"트레이 아이콘 로드 실패(기본 아이콘 사용): {ex.Message}");
-        }
         return System.Drawing.SystemIcons.Application;
+    }
+
+    /// 설정에서 캐릭터를 바꾸면 트레이 아이콘도 즉시 바꾼다.
+    public void SetCharacter(MascotCharacter character)
+    {
+        if (_disposed) return;
+        var previous = _ownedIcon;
+        var icon = LoadIcon(character);
+        _icon.Icon = icon;
+        if (previous is not null && !ReferenceEquals(previous, _ownedIcon)) previous.Dispose();
     }
 
     public void SetTooltip(string text)

@@ -42,4 +42,16 @@
     <Resource Include="Assets\tray.ico" />
   </ItemGroup>
 
+  <!-- 설정 창의 창 아이콘(선택한 캐릭터를 따름). 없으면 코드에서 app.ico / 기본 아이콘으로 대체한다. -->
+  <ItemGroup Condition="Exists('Assets\app.ico')">
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+  <ItemGroup Condition="Exists('Assets\app-maltese.ico')">
+    <Resource Include="Assets\app-maltese.ico" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('Assets\tray-orange.ico')">
+    <Resource Include="Assets\tray-orange.ico" />
+  </ItemGroup>
+
 </Project>

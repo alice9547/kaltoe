@@ -82,6 +82,11 @@
                     <RadioButton x:Name="RbTerminal" Content="터미널" GroupName="Style" Margin="0,0,16,0" VerticalAlignment="Center" />
                     <RadioButton x:Name="RbBubble" Content="말풍선" GroupName="Style" VerticalAlignment="Center" />
                 </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock Style="{StaticResource Label}" Text="캐릭터" Width="90" />
+                    <RadioButton x:Name="RbMaltese" Content="말티즈" GroupName="Character" Margin="0,0,16,0" VerticalAlignment="Center" />
+                    <RadioButton x:Name="RbOrange" Content="주황이" GroupName="Character" VerticalAlignment="Center" />
+                </StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Style="{StaticResource Label}" Text="글자 크기" Width="90" />
                     <TextBox x:Name="TbFontSize" Width="48" Margin="0" HorizontalContentAlignment="Right" MaxLength="3" />

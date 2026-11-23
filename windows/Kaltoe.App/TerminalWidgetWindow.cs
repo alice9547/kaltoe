@@ -30,6 +30,7 @@ internal sealed class TerminalWidgetWindow : FloatingWindow, IWidgetView
         return b;
     }
 
+    private readonly MascotArt _art;
     private readonly int _fontSize;
     private readonly double _factor;
     private readonly PlacementRequest _placement;
@@ -44,8 +45,9 @@ internal sealed class TerminalWidgetWindow : FloatingWindow, IWidgetView
 
     public event Action? HideRequested;
 
-    public TerminalWidgetWindow(int fontSize, PlacementRequest placement)
+    public TerminalWidgetWindow(MascotArt art, int fontSize, PlacementRequest placement)
     {
+        _art = art;
         _fontSize = fontSize;
         _factor = WidgetSizing.Factor(fontSize);
         _placement = placement;
@@ -53,8 +55,8 @@ internal sealed class TerminalWidgetWindow : FloatingWindow, IWidgetView
         Width = w;
         Height = h;
 
-        var cell = WidgetSizing.MascotCell(MascotData.Width, MascotData.Height, fontSize, WidgetStyle.Terminal);
-        _mascot = new MascotControl(cell, _factor, outline: false)
+        var cell = WidgetSizing.MascotCell(art.Width, art.Height, fontSize, WidgetStyle.Terminal);
+        _mascot = new MascotControl(art, cell, _factor, outline: false)
         {
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Bottom,
@@ -216,7 +218,7 @@ internal sealed class TerminalWidgetWindow : FloatingWindow, IWidgetView
             if (_cursor is not null) _cursor.Foreground = on ? B(0xF2F2F7) : Brushes.Transparent;
         }
         double? since = double.IsNaN(_jumpStart) ? null : seconds - _jumpStart;
-        _mascot.SetPose(MascotPlayback.Resolve(_mood, seconds, since, MascotData.Height));
+        _mascot.SetPose(MascotPlayback.Resolve(_mood, seconds, since, _art.Height));
     }
 
     protected override bool IsMascotHit(DependencyObject? source) => IsInside(source, _mascot);

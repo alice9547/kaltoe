@@ -12,19 +12,24 @@ internal sealed class MascotControl : FrameworkElement
 
     private static readonly Dictionary<uint, SolidColorBrush> BrushCache = new();
 
-    private readonly int _gw = Math.Max(1, MascotData.Width);
-    private readonly int _gh = Math.Max(1, MascotData.Height);
+    private readonly MascotArt _art;
+    private readonly int _gw;
+    private readonly int _gh;
     private readonly int _headroom;
     private readonly double _unit;          // 한 칸의 레이아웃 크기(DIP)
     private readonly bool _outline;         // 말풍선 모양: 실루엣 바깥 외곽선
     private readonly Dictionary<string, IReadOnlyList<(int X, int Y)>> _outlineCache = new();
     private MascotPose _pose = new(MascotFrames.Idle, MascotOverlay.None, 0, 0);
 
+    /// <param name="art">캐릭터 그림 데이터(격자 크기는 캐릭터마다 다를 수 있다).</param>
     /// <param name="cellPx">한 칸의 최종 화면 픽셀 크기(정수).</param>
     /// <param name="layoutScale">이 컨트롤을 감싼 LayoutTransform 의 배율(없으면 1). 최종 크기가 cellPx 가 되도록 보정한다.</param>
     /// <param name="outline">말풍선 모양이면 true(외곽선을 그린다).</param>
-    public MascotControl(int cellPx, double layoutScale, bool outline)
+    public MascotControl(MascotArt art, int cellPx, double layoutScale, bool outline)
     {
+        _art = art;
+        _gw = Math.Max(1, art.Width);
+        _gh = Math.Max(1, art.Height);
         _unit = Math.Max(1, cellPx) / (layoutScale <= 0 ? 1 : layoutScale);
         _outline = outline;
         _headroom = MascotPlayback.JumpHeadroomRows(_gh);
@@ -57,18 +62,18 @@ internal sealed class MascotControl : FrameworkElement
         return b;
     }
 
-    private static (string Name, string[] Rows) FrameRows(string name)
+    private (string Name, string[] Rows) FrameRows(string name)
     {
-        if (MascotData.Frames.TryGetValue(name, out var rows)) return (name, rows);
+        if (_art.Frames.TryGetValue(name, out var rows)) return (name, rows);
         // 자리표시 데이터에는 idle 만 있을 수 있다 — 없는 프레임은 idle 로 대신 그린다.
-        if (MascotData.Frames.TryGetValue(FallbackFrame, out rows)) return (FallbackFrame, rows);
-        foreach (var kv in MascotData.Frames) return (kv.Key, kv.Value);
+        if (_art.Frames.TryGetValue(FallbackFrame, out rows)) return (FallbackFrame, rows);
+        foreach (var kv in _art.Frames) return (kv.Key, kv.Value);
         return (FallbackFrame, Array.Empty<string>());
     }
 
-    private static bool IsOpaque(string[] rows, int x, int y)
+    private bool IsOpaque(string[] rows, int x, int y)
         => y >= 0 && y < rows.Length && x >= 0 && x < rows[y].Length
-           && rows[y][x] != '.' && MascotData.Palette.ContainsKey(rows[y][x]);
+           && rows[y][x] != '.' && _art.Palette.ContainsKey(rows[y][x]);
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -106,7 +111,7 @@ internal sealed class MascotControl : FrameworkElement
             for (var x = 0; x < row.Length && x < _gw; x++)
             {
                 var ch = row[x];
-                if (ch == '.' || !MascotData.Palette.TryGetValue(ch, out var rgb)) continue;
+                if (ch == '.' || !_art.Palette.TryGetValue(ch, out var rgb)) continue;
                 Cell(ox + x, oy + y, rgb);
             }
         }

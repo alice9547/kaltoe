@@ -8,6 +8,7 @@ namespace Kaltoe.App;
 /// 문구 길이에 따라 창 폭이 바뀌어도 마스코트(오른쪽 아래)가 제자리에 있도록 창의 오른쪽 아래 모서리를 기준(anchor)으로 배치한다.
 internal sealed class BubbleWidgetWindow : FloatingWindow, IWidgetView
 {
+    private readonly MascotArt _art;
     private readonly int _fontSize;
     private readonly PlacementRequest _placement;
     private readonly BubbleControl _bubble;
@@ -20,14 +21,15 @@ internal sealed class BubbleWidgetWindow : FloatingWindow, IWidgetView
     // 말풍선 위젯에는 신호등 점이 없다 — 숨기기는 메뉴로만.
     public event Action? HideRequested { add { } remove { } }
 
-    public BubbleWidgetWindow(int fontSize, PlacementRequest placement)
+    public BubbleWidgetWindow(MascotArt art, int fontSize, PlacementRequest placement)
     {
+        _art = art;
         _fontSize = fontSize;
         _placement = placement;
         SizeToContent = SizeToContent.WidthAndHeight;
 
         var factor = WidgetSizing.Factor(fontSize);
-        var cell = WidgetSizing.MascotCell(MascotData.Width, MascotData.Height, fontSize, WidgetStyle.Bubble);
+        var cell = WidgetSizing.MascotCell(art.Width, art.Height, fontSize, WidgetStyle.Bubble);
 
         _bubble = new BubbleControl(fontSize)
         {
@@ -36,7 +38,7 @@ internal sealed class BubbleWidgetWindow : FloatingWindow, IWidgetView
             // 꼬리가 마스코트 머리 쪽(오른쪽 아래)을 향하도록, 말풍선 오른쪽 끝을 마스코트보다 안쪽에 둔다.
             Margin = new Thickness(0, 0, Math.Round(24 * factor), 0),
         };
-        _mascot = new MascotControl(cell, 1.0, outline: true)
+        _mascot = new MascotControl(art, cell, 1.0, outline: true)
         {
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top,
@@ -123,7 +125,7 @@ internal sealed class BubbleWidgetWindow : FloatingWindow, IWidgetView
     {
         _seconds = seconds;
         double? since = double.IsNaN(_jumpStart) ? null : seconds - _jumpStart;
-        _mascot.SetPose(MascotPlayback.Resolve(_mood, seconds, since, MascotData.Height));
+        _mascot.SetPose(MascotPlayback.Resolve(_mood, seconds, since, _art.Height));
     }
 
     protected override bool IsMascotHit(DependencyObject? source) => IsInside(source, _mascot);
