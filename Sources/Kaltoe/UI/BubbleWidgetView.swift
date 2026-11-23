@@ -49,13 +49,14 @@ struct BubbleWidgetView: View {
 
     var body: some View {
         let snap = store.snapshot
-        let mascot = ScaledMascot.displaySize(baseSize: Self.baseMascot, ratio: k)
+        let mascot = ScaledMascot.displaySize(baseSize: Self.baseMascot, ratio: k, character: settings.settings.character)
         let step = 2 * k
         let tail = 3 * step
         let window = Self.size(fontSize: settings.settings.fontSize)
         return ZStack(alignment: .bottomTrailing) {
             ScaledMascot(mood: MascotMood.resolve(snap, settings: settings.settings), tick: clock.tick, jumpStart: clock.jumpStart,
-                         outline: true, baseSize: Self.baseMascot, ratio: k, onTap: { clock.jump() })
+                         outline: true, character: settings.settings.character,
+                         baseSize: Self.baseMascot, ratio: k, onTap: { clock.jump() })
                 .padding(.trailing, 2 * k)
                 .padding(.bottom, 2 * k)
 

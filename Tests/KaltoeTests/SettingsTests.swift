@@ -23,6 +23,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(s.notifyLunch && s.notifyBeforeEnd && s.notifyEnd)
         XCTAssertEqual(s.fontSize, 12)
         XCTAssertEqual(s.widgetStyle, .terminal)
+        XCTAssertEqual(s.character, .maltese)
         XCTAssertTrue(s.comprehensivePay)
         XCTAssertNil(s.rateAmount)
         XCTAssertEqual(s.rateUnit, .hour)
@@ -234,5 +235,47 @@ final class SettingsTests: XCTestCase {
         // 손으로 망가뜨린 저장값은 비움(최저시급)으로 되돌린다.
         defaults.set(-5, forKey: "settings.pay.rateAmount")
         XCTAssertNil(SettingsStore(defaults: defaults).settings.rateAmount)
+    }
+
+    // MARK: 캐릭터 (widget.character)
+
+    func testCharacter_validationAcceptsEveryCase() {
+        var s = WorkSettings()
+        for c in MascotCharacter.allCases {
+            s.character = c
+            XCTAssertEqual(SettingsValidator.validate(s), [], "\(c)")
+        }
+    }
+
+    func testCharacter_savedLoadedObservedAndFallsBack() {
+        let store = SettingsStore(defaults: defaults)
+        var seen: [MascotCharacter] = []
+        let c = store.$settings.dropFirst().sink { seen.append($0.character) }
+        var s = store.settings; s.character = .orange
+        XCTAssertEqual(store.update(s), [])
+        s.character = .maltese; store.update(s)
+        s.character = .orange; store.update(s)
+        XCTAssertEqual(seen, [.orange, .maltese, .orange])
+        c.cancel()
+        XCTAssertEqual(defaults.string(forKey: "settings.widget.character"), "orange")
+        XCTAssertEqual(SettingsStore(defaults: defaults).settings.character, .orange)
+        defaults.set("cat", forKey: "settings.widget.character")
+        XCTAssertEqual(SettingsStore(defaults: defaults).settings.character, .maltese, "모르는 값은 기본(말티즈)")
+        defaults.removeObject(forKey: "settings.widget.character")
+        XCTAssertEqual(SettingsStore(defaults: defaults).settings.character, .maltese)
+    }
+
+    func testCharacter_rawValuesMatchSpec() {
+        XCTAssertEqual(MascotCharacter.maltese.rawValue, "maltese")
+        XCTAssertEqual(MascotCharacter.orange.rawValue, "orange")
+        XCTAssertEqual(MascotCharacter.allCases.count, 2)
+    }
+
+    func testCharacter_persistFalseDoesNotSave() {
+        let store = SettingsStore(defaults: defaults)
+        var s = store.settings; s.character = .orange
+        store.update(s, persist: false)
+        XCTAssertEqual(store.settings.character, .orange)
+        XCTAssertEqual(SettingsStore(defaults: defaults).settings.character, .maltese)
     }
 }

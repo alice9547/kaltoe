@@ -99,6 +99,15 @@ struct SettingsView: View {
                     .labelsHidden()
                     .frame(width: 160)
                 }
+                row("캐릭터") {
+                    Picker("", selection: $draft.character) {
+                        Text("말티즈").tag(MascotCharacter.maltese)
+                        Text("주황이").tag(MascotCharacter.orange)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 160)
+                }
                 row("글자 크기") {
                     TextField("", text: $fontText)
                         .textFieldStyle(.roundedBorder)

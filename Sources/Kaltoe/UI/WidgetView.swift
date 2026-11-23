@@ -94,8 +94,8 @@ struct WidgetView: View {
             .padding(.top, 9 * k)
 
             MascotView(mood: MascotMood.resolve(snap, settings: settings.settings), tick: clock.tick, jumpStart: clock.jumpStart,
-                       onTap: { clock.jump() })
-                .scaledMascot(baseSize: Self.baseMascot, ratio: k)
+                       onTap: { clock.jump() }, character: settings.settings.character)
+                .scaledMascot(baseSize: Self.baseMascot, ratio: k, character: settings.settings.character)
                 .padding(.trailing, 8 * k)
                 .padding(.bottom, 6 * k)
         }

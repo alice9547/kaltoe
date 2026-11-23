@@ -1,5 +1,6 @@
 // 앱 진입점.
 import AppKit
+import Combine
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = WorkdayStore()
@@ -9,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBar: MenuBarController?
     private var settingsWindow: SettingsWindowController?
     private var demoTimer: Timer?
+    private var iconCancellable: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         var actions = AppActions()
@@ -54,6 +56,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settings.update(s, persist: false)
         }
 
+        // 확인용: `--character maltese|orange` 도 저장 없이 이번 실행에만 캐릭터를 바꾼다.
+        if let i = CommandLine.arguments.firstIndex(of: "--character"),
+           CommandLine.arguments.indices.contains(i + 1),
+           let character = MascotCharacter(rawValue: CommandLine.arguments[i + 1]) {
+            var s = settings.settings
+            s.character = character
+            settings.update(s, persist: false)
+        }
+
         // 확인용: `--style terminal|bubble` 도 저장 없이 이번 실행에만 모양을 바꾼다.
         if let i = CommandLine.arguments.firstIndex(of: "--style"),
            CommandLine.arguments.indices.contains(i + 1),
@@ -61,6 +72,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             var s = settings.settings
             s.widgetStyle = style
             settings.update(s, persist: false)
+        }
+
+        // Finder 앱 아이콘이 캐릭터 설정을 따른다 (시작 때 한 번, 이후 캐릭터가 바뀔 때). 번들이 없으면 아무 일도 안 한다.
+        iconCancellable = settings.$settings.map(\.character).removeDuplicates().sink { character in
+            AppIconSwitcher.apply(character: character)
         }
 
         // 확인용: 설정 창을 바로 띄운다.

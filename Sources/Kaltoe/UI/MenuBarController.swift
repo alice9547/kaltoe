@@ -9,6 +9,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let actions: AppActions
     private let statusItem: NSStatusItem
     private var cancellable: AnyCancellable?
+    private var characterCancellable: AnyCancellable?
     private var lastTitle: String?
 
     init(store: WorkdayStore, settings: SettingsStore, widget: WidgetController, actions: AppActions) {
@@ -27,7 +28,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         super.init()
 
         if let button = statusItem.button {
-            button.image = MascotImage.menuBarTemplate(pointSize: 16)
+            button.image = MascotImage.menuBarTemplate(pointSize: 16, character: settings.settings.character)
             button.imagePosition = .imageLeft
         }
         let menu = NSMenu()
@@ -36,6 +37,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         applyTitle(store.snapshot)
         cancellable = store.$snapshot.sink { [weak self] snap in self?.applyTitle(snap) }
+        // 캐릭터를 바꾸면 메뉴바 아이콘도 즉시 바꾼다.
+        characterCancellable = settings.$settings.map(\.character).removeDuplicates().sink { [weak self] character in
+            self?.statusItem.button?.image = MascotImage.menuBarTemplate(pointSize: 16, character: character)
+        }
     }
 
     deinit { NSStatusBar.system.removeStatusItem(statusItem) }
