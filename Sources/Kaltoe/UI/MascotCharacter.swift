@@ -25,11 +25,11 @@ enum MascotCharacter: String, CaseIterable {
 
     /// 메뉴바 템플릿 이미지로 쓸 idle 프레임의 행 범위(얼굴·몸통 부분).
     var menuBarRows: Range<Int> {
-        switch self { case .maltese: return 0..<14; case .orange: return 3..<17 }
+        switch self { case .maltese: return 0..<14; case .orange: return 3..<14 }
     }
 
     /// 메뉴바 템플릿에서 투명하게 뚫는 팔레트 문자(눈·코·입).
     var menuBarCutouts: Set<Character> {
-        switch self { case .maltese: return ["K", "M", "T"]; case .orange: return ["E", "T"] }
+        switch self { case .maltese: return ["K", "M", "T"]; case .orange: return ["E"] }
     }
 }

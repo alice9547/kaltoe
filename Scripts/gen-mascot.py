@@ -194,11 +194,16 @@ def ico(images):
     return head + entries + blobs
 
 
-def master_icon(frame, pal, bg, size=1024):
+def master_icon(frame, pal, bg, size=1024, center_bbox=False):
     img = rounded_bg(size, round(size * 100 / 1024), 0.225, bg)
     scale = int(size * 0.70) // len(frame[0])
     ox = (size - scale * len(frame[0])) // 2
     oy = (size - scale * len(frame)) // 2 + scale // 2
+    if center_bbox:   # 불투명 픽셀의 경계 상자 기준으로 가운데에 놓는다 (여백이 비대칭인 격자용)
+        cols = [x for r in frame for x, ch in enumerate(r) if ch != "."]
+        rws = [y for y, r in enumerate(frame) if any(ch != "." for ch in r)]
+        ox = (size - scale * (max(cols) - min(cols) + 1)) // 2 - min(cols) * scale
+        oy = (size - scale * (max(rws) - min(rws) + 1)) // 2 - min(rws) * scale
     draw_frame(img, frame, pal, ox, oy, scale)
     return img
 
@@ -213,9 +218,9 @@ def master_tray(frame, pal, rows=(0, 14)):
     return img
 
 
-def icon_set(frame, pal, bg):
+def icon_set(frame, pal, bg, center_bbox=False):
     """마스터 1024 → {크기: Img} 캐시 함수."""
-    m = master_icon(frame, pal, bg)
+    m = master_icon(frame, pal, bg, center_bbox=center_bbox)
     m512 = resample(m, 512, 512)
     m256 = resample(m512, 256, 256)
     cache = {1024: m, 512: m512, 256: m256}
@@ -235,7 +240,7 @@ def gen_icons(maltese, orange):
     os.makedirs(assets, exist_ok=True)
 
     # 앱 아이콘 = 주황이 idle
-    m, at = icon_set(oframes["idle"], opal, ICON_BG_ORANGE)
+    m, at = icon_set(oframes["idle"], opal, ICON_BG_ORANGE, center_bbox=True)
     open(os.path.join(res, "AppIcon-1024.png"), "wb").write(png(m))
     with tempfile.TemporaryDirectory() as td:
         iconset = os.path.join(td, "AppIcon.iconset")
@@ -257,7 +262,7 @@ def gen_icons(maltese, orange):
     # 트레이 아이콘 (배경 없이 얼굴만)
     t = master_tray(frames["idle"], pal)
     open(os.path.join(assets, "tray.ico"), "wb").write(ico([(n, png(resample(t, n, n))) for n in (16, 20, 24, 32)]))
-    to = master_tray(oframes["idle"], opal, rows=(3, 17))
+    to = master_tray(oframes["idle"], opal, rows=(3, 14))
     open(os.path.join(assets, "tray-orange.ico"), "wb").write(ico([(n, png(resample(to, n, n))) for n in (16, 20, 24, 32)]))
 
 
