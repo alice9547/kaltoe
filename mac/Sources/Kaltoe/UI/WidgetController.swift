@@ -10,7 +10,22 @@ final class WidgetPanel: NSPanel {
 
 /// 첫 클릭부터 바로 반응하게 한다 (비활성 앱 위에서도 빨간 점·마스코트 클릭 가능).
 private final class WidgetHostingView<Content: View>: NSHostingView<Content> {
+    /// 오른쪽 클릭 메뉴를 만들어 주는 함수 (메뉴바 메뉴와 같은 것).
+    var menuProvider: (() -> NSMenu?)?
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func rightMouseDown(with event: NSEvent) { showMenu(event) }
+
+    // control+클릭도 오른쪽 클릭으로 본다.
+    override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.control) { showMenu(event) } else { super.mouseDown(with: event) }
+    }
+
+    private func showMenu(_ event: NSEvent) {
+        guard let menu = menuProvider?() else { return }
+        NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
 }
 
 /// 항상 최상단에 뜨는 플로팅 위젯 창.
@@ -32,6 +47,13 @@ final class WidgetController {
     private var layoutCancellable: AnyCancellable?
     private var currentFontSize: Int
     private var currentStyle: WidgetStyle
+    private var mouseUpMonitor: Any?
+    private var hosting: WidgetHostingView<WidgetRootView>!
+
+    /// 위젯 오른쪽 클릭 때 띄울 메뉴. 메뉴바 메뉴와 같은 NSMenu 를 만들어 준다.
+    var contextMenuProvider: (() -> NSMenu?)? {
+        didSet { hosting.menuProvider = contextMenuProvider }
+    }
 
     init(store: WorkdayStore, settings: SettingsStore) {
         self.store = store
@@ -54,6 +76,7 @@ final class WidgetController {
         // 뷰의 닫기 클로저는 아래에서 self 를 쓰므로 초기화 후 연결한다.
         let view = WidgetRootView(store: store, settings: settings, clock: clock, onClose: { [weak self] in self?.hide() })
         let hosting = WidgetHostingView(rootView: view)
+        self.hosting = hosting
         hosting.frame = NSRect(origin: .zero, size: size)
         panel.contentView = hosting
 
@@ -62,6 +85,11 @@ final class WidgetController {
             .map { Layout(style: $0.widgetStyle, fontSize: $0.fontSize) }
             .removeDuplicates()
             .sink { [weak self] in self?.applyLayout($0) }
+        // 드래그를 놓으면 화면 밖으로 나간 위젯을 안으로 밀어 넣는다.
+        mouseUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { [weak self] event in
+            if let self, event.window === self.panel { self.rescueIfOffscreen() }
+            return event
+        }
         // 드래그 중·후의 위치를 저장한다.
         moveObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didMoveNotification, object: panel, queue: .main
@@ -120,6 +148,7 @@ final class WidgetController {
 
     deinit {
         if let moveObserver { NotificationCenter.default.removeObserver(moveObserver) }
+        if let mouseUpMonitor { NSEvent.removeMonitor(mouseUpMonitor) }
     }
 
     var isVisible: Bool { panel.isVisible }
@@ -136,18 +165,30 @@ final class WidgetController {
         defaults.set(false, forKey: Key.visible)
     }
 
+    /// 재실행 때: 보이게 하고 주 화면 오른쪽 위(현재 모양 크기 기준)로 옮긴다. 옮긴 위치는 didMove 가 저장한다.
+    func revealAtDefaultPosition() {
+        let area = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
+            ?? NSRect(x: 100, y: 100, width: 1200, height: 800)
+        let size = panel.frame.size
+        panel.setFrameOrigin(WidgetPlacement.topRightOrigin(size: size, area: area))
+        defaults.set(NSStringFromPoint(panel.frame.origin), forKey: Key.origin(currentStyle))
+        show()
+    }
+
+    private func rescueIfOffscreen() {
+        let areas = NSScreen.screens.map(\.visibleFrame)
+        let fixed = WidgetPlacement.corrected(panel.frame, areas: areas)
+        if fixed != panel.frame { panel.setFrame(fixed, display: true) }
+    }
+
     // MARK: 위치
 
     private func restoredOrigin(style: WidgetStyle, size: CGSize) -> NSPoint {
         if let s = defaults.string(forKey: Key.origin(style)) {
             let p = NSPointFromString(s)
             let frame = NSRect(origin: p, size: size)
-            // 어느 화면에든 일부(60×26)가 걸쳐 있어야 유효.
-            let valid = NSScreen.screens.contains { screen in
-                let i = screen.visibleFrame.intersection(frame)
-                return !i.isNull && i.width >= 60 && i.height >= 26
-            }
-            if valid { return p }
+            // 어느 화면에든 가로·세로 48pt 이상 걸쳐 있어야 유효.
+            if WidgetPlacement.isReachable(frame, areas: NSScreen.screens.map(\.visibleFrame)) { return p }
         }
         return defaultOrigin(style: style, size: size)
     }

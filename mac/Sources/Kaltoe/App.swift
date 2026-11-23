@@ -29,7 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let widget = WidgetController(store: store, settings: settings)
         self.widget = widget
         menuBar = MenuBarController(store: store, settings: settings, widget: widget, actions: actions)
-        widget.show()
+        widget.contextMenuProvider = { [weak self] in self?.menuBar?.makeMenu() }
+        widget.show()      // 시작하면 저장된 숨김 상태와 무관하게 항상 보인다
 
         if let demo = DemoMode.fromArguments() {
             startDemo(demo)
@@ -81,6 +82,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 확인용: 설정 창을 바로 띄운다.
         if CommandLine.arguments.contains("--settings") { settingsWindow?.show() }
+    }
+
+    /// 실행 중인 앱을 다시 열면(Finder 더블클릭) 위젯을 꺼내 기본 위치로 옮긴다.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        widget?.revealAtDefaultPosition()
+        return true
     }
 
     /// 앱이 꺼져 있으면 출근을 실시간으로 못 잡으므로, 처음 한 번은 자동 실행을 켠다.

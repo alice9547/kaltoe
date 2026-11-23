@@ -58,6 +58,17 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     // MARK: 메뉴 (열릴 때마다 최신 상태로 다시 만든다)
 
     func menuNeedsUpdate(_ menu: NSMenu) {
+        populate(menu)
+    }
+
+    /// 메뉴바 메뉴와 위젯 오른쪽 클릭 메뉴가 같이 쓰는 새 메뉴.
+    func makeMenu() -> NSMenu {
+        let menu = NSMenu()
+        populate(menu)
+        return menu
+    }
+
+    private func populate(_ menu: NSMenu) {
         menu.removeAllItems()
         let snap = store.snapshot
 
