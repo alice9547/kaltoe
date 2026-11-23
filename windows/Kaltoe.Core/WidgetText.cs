@@ -126,7 +126,7 @@ public static class WidgetText
                     Out("Process finished with exit code 0", LineStyle.Success),
                     Out($"퇴근하세요! out {Clock(s.ClockOut)}"),
                 };
-                if (s.Overtime >= TimeSpan.FromSeconds(60)) done.Add(Out($"# 야근 중 {Overtime(s.Overtime)}", LineStyle.Comment));
+                if (s.Overtime >= TimeSpan.FromSeconds(60)) done.AddRange(OvertimeLines(s, settings.Pay));
                 return done;
 
             default: // Working
@@ -139,6 +139,26 @@ public static class WidgetText
                     Out(Comment(s), LineStyle.Comment),
                 };
         }
+    }
+
+    /// done 단계 야근 줄(야근 ≥ 1분): `# 야근 중 +0h 12m` 아래에 연장수당 한 줄(총 5줄). 금액 부분은 강조색.
+    public static IReadOnlyList<TerminalLine> OvertimeLines(WorkdaySnapshot s, PaySettings pay)
+    {
+        var overtime = new TerminalLine(new[] { new TextSpan($"# 야근 중 {Overtime(s.Overtime)}", LineStyle.Comment) });
+        var amount = PayCalc.Allowance(PayCalc.OvertimeMinutes(s.Overtime), pay);
+        var payLine = pay.Comprehensive
+            ? new TerminalLine(new[]
+            {
+                new TextSpan("# 포괄이라 ", LineStyle.Comment),
+                new TextSpan(PayCalc.FormatWon(0), LineStyle.Accent),
+                new TextSpan($" (원래 +{PayCalc.FormatWon(amount)})", LineStyle.Comment),
+            })
+            : new TerminalLine(new[]
+            {
+                new TextSpan("# 연장수당 ", LineStyle.Comment),
+                new TextSpan($"+{PayCalc.FormatWon(amount)}", LineStyle.Accent),
+            });
+        return new[] { overtime, payLine };
     }
 
     // ── 트레이 ──
@@ -165,6 +185,17 @@ public static class WidgetText
     /// 출근이 없으면 null(항목 생략).
     public static string? ClockOutMenuTitle(WorkdaySnapshot s)
         => s.ClockOut is null ? null : $"퇴근 {Clock(s.ClockOut)}";
+
+    /// 연장수당 메뉴 항목(퇴근 줄 아래, 비활성). done 이고 야근 1분 이상일 때만, 아니면 null.
+    public static string? AllowanceMenuTitle(WorkdaySnapshot s, PaySettings pay)
+    {
+        if (s.Phase != WorkPhase.Done) return null;
+        var minutes = PayCalc.OvertimeMinutes(s.Overtime);
+        if (minutes < 1) return null;
+        return pay.Comprehensive
+            ? $"연장수당 {PayCalc.FormatWon(0)} (포괄)"
+            : $"연장수당 +{PayCalc.FormatWon(PayCalc.Allowance(minutes, pay))}";
+    }
 
     /// 점심 사용 중일 때만. 설정 값 그대로.
     public static string? LunchMenuTitle(AppSettings s)

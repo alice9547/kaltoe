@@ -16,11 +16,11 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         Load(host.CurrentSettings);
 
-        foreach (var tb in new[] { TbEarliest, TbHours, TbMinutes, TbFixedStart, TbFixedEnd, TbLunchStart, TbLunchEnd, TbFontSize })
+        foreach (var tb in new[] { TbEarliest, TbHours, TbMinutes, TbFixedStart, TbFixedEnd, TbLunchStart, TbLunchEnd, TbFontSize, TbRate })
             tb.TextChanged += (_, _) => OnChanged();
-        foreach (var rb in new[] { RbFlexible, RbFixed, RbTerminal, RbBubble })
+        foreach (var rb in new[] { RbFlexible, RbFixed, RbTerminal, RbBubble, RbPerHour, RbPerMinute })
             rb.Checked += (_, _) => OnChanged();
-        foreach (var cb in new[] { CbLunch, CbNotifyLunch, CbNotifyBeforeEnd, CbNotifyEnd })
+        foreach (var cb in new[] { CbComprehensive, CbLunch, CbNotifyLunch, CbNotifyBeforeEnd, CbNotifyEnd })
         {
             cb.Checked += (_, _) => OnChanged();
             cb.Unchecked += (_, _) => OnChanged();
@@ -52,6 +52,11 @@ public partial class SettingsWindow : Window
             RbTerminal.IsChecked = s.Widget.Style == WidgetStyle.Terminal;
             RbBubble.IsChecked = s.Widget.Style == WidgetStyle.Bubble;
             TbFontSize.Text = s.Widget.FontSize.ToString();
+            CbComprehensive.IsChecked = s.Pay.Comprehensive;
+            TbRate.Text = s.Pay.RateAmount?.ToString() ?? "";
+            RbPerHour.IsChecked = s.Pay.RateUnit == PayUnit.Hour;
+            RbPerMinute.IsChecked = s.Pay.RateUnit == PayUnit.Minute;
+            RatePlaceholder.Visibility = string.IsNullOrEmpty(TbRate.Text) ? Visibility.Visible : Visibility.Collapsed;
             CbLaunch.IsChecked = _host.LaunchAtLogin;
             UpdateEnabled();
             TbPreview.Text = WidgetText.Preview(s, _host.Today, _host.TodayClockIn);
@@ -85,6 +90,7 @@ public partial class SettingsWindow : Window
     {
         if (_loading) return;
         UpdateEnabled();
+        RatePlaceholder.Visibility = string.IsNullOrEmpty(TbRate.Text) ? Visibility.Visible : Visibility.Collapsed;
 
         var (result, error) = Read();
         if (result is null)
@@ -138,6 +144,7 @@ public partial class SettingsWindow : Window
         if (!Time(TbLunchStart, "점심 시작", current.Lunch.Start, lunchOn, out var lunchStart)) return (null, error);
         if (!Time(TbLunchEnd, "점심 끝", current.Lunch.End, lunchOn, out var lunchEnd)) return (null, error);
         if (!WidgetSizing.TryParseFontSize(TbFontSize.Text, out var fontSize, out error)) return (null, error);
+        if (!PayCalc.TryParseRate(TbRate.Text, out var rate, out error)) return (null, error);
 
         var settings = new AppSettings
         {
@@ -155,6 +162,12 @@ public partial class SettingsWindow : Window
             {
                 Style = RbBubble.IsChecked == true ? WidgetStyle.Bubble : WidgetStyle.Terminal,
                 FontSize = fontSize,
+            },
+            Pay = new PaySettings
+            {
+                Comprehensive = CbComprehensive.IsChecked == true,
+                RateAmount = rate,
+                RateUnit = RbPerMinute.IsChecked == true ? PayUnit.Minute : PayUnit.Hour,
             },
         };
         return (settings, null);

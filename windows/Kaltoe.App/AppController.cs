@@ -46,7 +46,7 @@ internal sealed class AppController : ISettingsHost, IDisposable
                 Style = options.Style ?? WidgetStyle.Terminal,
                 FontSize = options.FontSize ?? WidgetSizing.DefaultFontSize,
             };
-            _demo = DemoScenario.Create(options.DemoName, DateTime.Today, widget);
+            _demo = DemoScenario.Create(options.DemoName, DateTime.Today, widget, new PaySettings { Comprehensive = options.Comprehensive ?? new PaySettings().Comprehensive });
         }
     }
 

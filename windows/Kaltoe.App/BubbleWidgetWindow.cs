@@ -12,7 +12,7 @@ internal sealed class BubbleWidgetWindow : FloatingWindow, IWidgetView
     private readonly PlacementRequest _placement;
     private readonly BubbleControl _bubble;
     private readonly MascotControl _mascot;
-    private WorkPhase _phase = WorkPhase.Waiting;
+    private MascotMood _mood = MascotMood.Sleep;
     private double _jumpStart = double.NaN;
     private double _seconds;
     private (int Right, int Bottom)? _anchor;
@@ -115,15 +115,15 @@ internal sealed class BubbleWidgetWindow : FloatingWindow, IWidgetView
 
     public void Update(WorkdaySnapshot snapshot, AppSettings settings)
     {
-        _phase = snapshot.Phase;
-        _bubble.Text = BubbleText.Line(snapshot);
+        _mood = MascotPlayback.MoodOf(snapshot, settings.Pay);
+        _bubble.Text = BubbleText.Line(snapshot, settings.Pay);
     }
 
     public void Animate(double seconds)
     {
         _seconds = seconds;
         double? since = double.IsNaN(_jumpStart) ? null : seconds - _jumpStart;
-        _mascot.SetPose(MascotPlayback.Resolve(MascotPlayback.MoodOf(_phase), seconds, since, MascotData.Height));
+        _mascot.SetPose(MascotPlayback.Resolve(_mood, seconds, since, MascotData.Height));
     }
 
     protected override bool IsMascotHit(DependencyObject? source) => IsInside(source, _mascot);

@@ -8,11 +8,11 @@ public sealed record DemoScenario(string Name, AppSettings Settings, DateTime? C
     /// 가상 시각 = StartNow + 실제 경과 시간.
     public WorkdaySnapshot Snapshot(TimeSpan elapsed) => SnapshotCalculator.Make(Settings, StartNow + elapsed, ClockIn);
 
-    public static DemoScenario? Create(string? name, DateTime today, WidgetSettings? widget = null)
+    public static DemoScenario? Create(string? name, DateTime today, WidgetSettings? widget = null, PaySettings? pay = null)
     {
         var d = today.Date;
         DateTime At(int h, int m, int s = 0) => d.AddHours(h).AddMinutes(m).AddSeconds(s);
-        var baseSettings = AppSettings.Default with { Widget = widget ?? new WidgetSettings() };
+        var baseSettings = AppSettings.Default with { Widget = widget ?? new WidgetSettings(), Pay = pay ?? new PaySettings() };
         var flex = baseSettings;
         var fixedLunch = baseSettings with
         {
@@ -32,14 +32,14 @@ public sealed record DemoScenario(string Name, AppSettings Settings, DateTime? C
     }
 }
 
-/// 실행 인자 해석: `--demo <이름>` `--style terminal|bubble` `--font-size <px>`.
-public sealed record LaunchOptions(string? DemoName, WidgetStyle? Style, int? FontSize, string? Error)
+/// 실행 인자 해석: `--demo <이름>` `--style terminal|bubble` `--font-size <px>` `--comprehensive on|off`(생략하면 설정 기본값인 켜짐).
+public sealed record LaunchOptions(string? DemoName, WidgetStyle? Style, int? FontSize, string? Error, bool? Comprehensive = null)
 {
     public bool IsDemo => DemoName is not null;
 
     public static LaunchOptions Parse(IReadOnlyList<string> args)
     {
-        string? demo = null; WidgetStyle? style = null; int? font = null;
+        string? demo = null; WidgetStyle? style = null; int? font = null; bool? comprehensive = null;
         for (var i = 0; i < args.Count; i++)
         {
             var a = args[i];
@@ -61,13 +61,19 @@ public sealed record LaunchOptions(string? DemoName, WidgetStyle? Style, int? Fo
                     if (!WidgetSizing.TryParseFontSize(Next(), out var px, out var err)) return new(null, null, null, err);
                     font = px;
                     break;
+                case "--comprehensive":
+                    var onOff = Next()?.ToLowerInvariant();
+                    if (onOff is "on" or "true") comprehensive = true;
+                    else if (onOff is "off" or "false") comprehensive = false;
+                    else return new(null, null, null, "--comprehensive 에는 on|off 중 하나를 지정하세요");
+                    break;
                 default:
                     return new(null, null, null, $"알 수 없는 실행 인자: {a}");
             }
         }
         // --style / --font-size 는 데모 모드에서만 의미가 있다.
-        if (demo is null && (style is not null || font is not null))
-            return new(null, null, null, "--style, --font-size 는 --demo 와 함께만 쓸 수 있습니다");
-        return new(demo, style, font, null);
+        if (demo is null && (style is not null || font is not null || comprehensive is not null))
+            return new(null, null, null, "--style, --font-size, --comprehensive 는 --demo 와 함께만 쓸 수 있습니다");
+        return new(demo, style, font, null, comprehensive);
     }
 }

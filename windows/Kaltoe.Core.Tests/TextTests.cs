@@ -155,7 +155,7 @@ public class TextTests
         var lines = Plain(Snap(st, At(9, 16), At(18, 28, 30)), st);
         Assert.Equal(new[]
         {
-            "$ exit", "Process finished with exit code 0", "퇴근하세요! out 18:16", "# 야근 중 +0h 12m",
+            "$ exit", "Process finished with exit code 0", "퇴근하세요! out 18:16", "# 야근 중 +0h 12m", "# 포괄이라 0원 (원래 +2,064원)",
         }, lines);
     }
 
@@ -164,7 +164,7 @@ public class TextTests
     {
         var st = Flex();
         Assert.Equal(3, Plain(Snap(st, At(9, 16), At(18, 16, 59)), st).Length);
-        Assert.Equal(4, Plain(Snap(st, At(9, 16), At(18, 17, 0)), st).Length);
+        Assert.Equal(5, Plain(Snap(st, At(9, 16), At(18, 17, 0)), st).Length);
     }
 
     // ── 색 스타일 ──

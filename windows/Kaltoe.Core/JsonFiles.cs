@@ -66,7 +66,7 @@ public sealed record AppFile
             if (file is null) return new AppFile();
             file = file with { Settings = file.Settings ?? new AppSettings(), Widget = file.Widget ?? new WidgetState() };
             if (file.Settings.Flexible is null || file.Settings.Fixed is null || file.Settings.Lunch is null
-                || file.Settings.Notify is null || file.Settings.Widget is null
+                || file.Settings.Notify is null || file.Settings.Widget is null || file.Settings.Pay is null
                 || SettingsValidator.Validate(file.Settings) is not null)
                 return file with { Settings = new AppSettings() };
             return file;

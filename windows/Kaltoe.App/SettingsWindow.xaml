@@ -94,6 +94,26 @@
             </StackPanel>
         </GroupBox>
 
+        <GroupBox Header="야근">
+            <StackPanel>
+                <CheckBox x:Name="CbComprehensive" Content="포괄임금제" Margin="0,0,0,6" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Style="{StaticResource Label}" Text="연장수당 단가" Width="90" />
+                    <Grid>
+                        <TextBox x:Name="TbRate" Width="110" Margin="0" HorizontalContentAlignment="Right" MaxLength="8" />
+                        <!-- 자리표시 글자: 비어 있을 때만 보인다 -->
+                        <TextBlock x:Name="RatePlaceholder" Text="최저시급 10,320" Foreground="#9E9E9E"
+                                   IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    </Grid>
+                    <TextBlock Style="{StaticResource Label}" Text="원" Margin="6,0,10,0" />
+                    <RadioButton x:Name="RbPerHour" Content="시간당" GroupName="RateUnit" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <RadioButton x:Name="RbPerMinute" Content="분당" GroupName="RateUnit" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Text="비워 두면 최저시급(시간당 10,320원)으로 계산합니다. 참고용 금액입니다."
+                           TextWrapping="Wrap" Foreground="#6E6E73" FontSize="12" />
+            </StackPanel>
+        </GroupBox>
+
         <CheckBox x:Name="CbLaunch" Content="로그인 시 자동 실행" Margin="0,0,0,10" />
 
         <TextBlock x:Name="TbPreview" Margin="0,0,0,4" FontFamily="Cascadia Mono, Consolas, Malgun Gothic" />

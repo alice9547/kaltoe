@@ -37,7 +37,7 @@ internal sealed class TerminalWidgetWindow : FloatingWindow, IWidgetView
     private readonly MascotControl _mascot;
     private Run? _cursor;
     private string _signature = "";
-    private WorkPhase _phase = WorkPhase.Waiting;
+    private MascotMood _mood = MascotMood.Sleep;
     private double _jumpStart = double.NaN;
     private double _seconds;
     private bool _cursorOn = true;
@@ -175,7 +175,7 @@ internal sealed class TerminalWidgetWindow : FloatingWindow, IWidgetView
 
     public void Update(WorkdaySnapshot snapshot, AppSettings settings)
     {
-        _phase = snapshot.Phase;
+        _mood = MascotPlayback.MoodOf(snapshot, settings.Pay);
         var lines = WidgetText.Lines(snapshot, settings);
         var signature = string.Join("\n", lines.Select(l => string.Join("|", l.Spans.Select(s => $"{(int)s.Style}:{s.Text}"))));
         if (signature == _signature) return;
@@ -216,7 +216,7 @@ internal sealed class TerminalWidgetWindow : FloatingWindow, IWidgetView
             if (_cursor is not null) _cursor.Foreground = on ? B(0xF2F2F7) : Brushes.Transparent;
         }
         double? since = double.IsNaN(_jumpStart) ? null : seconds - _jumpStart;
-        _mascot.SetPose(MascotPlayback.Resolve(MascotPlayback.MoodOf(_phase), seconds, since, MascotData.Height));
+        _mascot.SetPose(MascotPlayback.Resolve(_mood, seconds, since, MascotData.Height));
     }
 
     protected override bool IsMascotHit(DependencyObject? source) => IsInside(source, _mascot);

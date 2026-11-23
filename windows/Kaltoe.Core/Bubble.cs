@@ -13,13 +13,23 @@ public static class BubbleText
     /// 분 단위 내림(야근).
     public static int FloorMinutes(TimeSpan span) => span <= TimeSpan.Zero ? 0 : (int)(span.Ticks / TimeSpan.TicksPerMinute);
 
-    public static string Line(WorkdaySnapshot s) => s.Phase switch
+    /// 야근 1분 이상이면 `야근 12분 · +3,096원` / 포괄이면 `야근 12분 · 0원 (포괄)`, 아니면 `퇴근하세요!`.
+    private static string DoneLine(WorkdaySnapshot s, PaySettings pay)
+    {
+        var minutes = FloorMinutes(s.Overtime);
+        if (minutes < 1) return "퇴근하세요!";
+        return pay.Comprehensive
+            ? $"야근 {minutes}분 · {PayCalc.FormatWon(0)} (포괄)"
+            : $"야근 {minutes}분 · +{PayCalc.FormatWon(PayCalc.Allowance(minutes, pay))}";
+    }
+
+    public static string Line(WorkdaySnapshot s, PaySettings? pay = null) => s.Phase switch
     {
         WorkPhase.Waiting => s.Target is null ? "출근 전…" : $"출근 {CeilMinutes(s.Remaining)}분 전",
         WorkPhase.BeforeLunch => $"점심 {CeilMinutes(s.Remaining)}분 전",
         WorkPhase.Lunch => $"점심 끝 {CeilMinutes(s.Remaining)}분 전",
         WorkPhase.AlmostDone => $"퇴근 {CeilMinutes(s.Remaining)}분 전!",
-        WorkPhase.Done => s.Overtime >= TimeSpan.FromSeconds(60) ? $"퇴근하세요! +{FloorMinutes(s.Overtime)}분" : "퇴근하세요!",
+        WorkPhase.Done => DoneLine(s, pay ?? new PaySettings()),
         _ => $"퇴근 {CeilMinutes(s.Remaining)}분 전",   // Working
     };
 }

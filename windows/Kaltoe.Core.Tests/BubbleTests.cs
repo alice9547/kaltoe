@@ -6,7 +6,7 @@ namespace Kaltoe.Core.Tests;
 public class BubbleTextTests
 {
     private static WorkdaySnapshot Snap(AppSettings s, DateTime? clockIn, DateTime now) => SnapshotCalculator.Make(s, now, clockIn);
-    private static string B(AppSettings s, DateTime? clockIn, DateTime now) => BubbleText.Line(Snap(s, clockIn, now));
+    private static string B(AppSettings s, DateTime? clockIn, DateTime now) => BubbleText.Line(Snap(s, clockIn, now), s.Pay);
 
     // ── 올림 경계 ──
 
@@ -84,8 +84,8 @@ public class BubbleTextTests
     public void Done_Overtime_FloorMinutes()
     {
         Assert.Equal("퇴근하세요!", B(Flex(), At(9, 16), At(18, 16, 59)));
-        Assert.Equal("퇴근하세요! +1분", B(Flex(), At(9, 16), At(18, 17, 0)));
-        Assert.Equal("퇴근하세요! +12분", B(Flex(), At(9, 16), At(18, 28, 59)));
+        Assert.Equal("야근 1분 · 0원 (포괄)", B(Flex(), At(9, 16), At(18, 17, 0)));
+        Assert.Equal("야근 12분 · 0원 (포괄)", B(Flex(), At(9, 16), At(18, 28, 59)));
     }
 }
 

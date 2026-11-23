@@ -88,6 +88,7 @@ internal sealed class TrayController : IDisposable
 
         Info(WidgetText.ClockInMenuTitle(st.Snapshot));
         if (WidgetText.ClockOutMenuTitle(st.Snapshot) is { } outTitle) Info(outTitle);
+        if (WidgetText.AllowanceMenuTitle(st.Snapshot, st.Settings.Pay) is { } payTitle) Info(payTitle);
         if (WidgetText.LunchMenuTitle(st.Settings) is { } lunchTitle) Info(lunchTitle);
         _menu.Items.Add(new ToolStripSeparator());
 

@@ -1,17 +1,18 @@
 // 마스코트 재생 순서 — docs/spec.md 6절 표. 프레임 데이터는 앱의 MascotData 가 가지고 있고, 여기서는 "어느 프레임을 언제" 만 계산한다.
 namespace Kaltoe.Core;
 
-public enum MascotMood { Sleep, Idle, Eat, Sparkle, Dance }
+public enum MascotMood { Sleep, Idle, Eat, Sparkle, Dance, Angry, Cry }
 
 public enum MascotOverlay { None, Zzz, Confetti }
 
 public static class MascotFrames
 {
     public const string Idle = "idle", Blink = "blink", Breathe = "breathe", Sleep = "sleep",
-        Eat1 = "eat1", Eat2 = "eat2", Sparkle = "sparkle", Hop = "hop", DanceL = "danceL", DanceR = "danceR";
+        Eat1 = "eat1", Eat2 = "eat2", Sparkle = "sparkle", Hop = "hop", DanceL = "danceL", DanceR = "danceR",
+        Angry1 = "angry1", Angry2 = "angry2", Cry1 = "cry1", Cry2 = "cry2";
 
     public static readonly IReadOnlyList<string> All = new[]
-        { Idle, Blink, Breathe, Sleep, Eat1, Eat2, Sparkle, Hop, DanceL, DanceR };
+        { Idle, Blink, Breathe, Sleep, Eat1, Eat2, Sparkle, Hop, DanceL, DanceR, Angry1, Angry2, Cry1, Cry2 };
 }
 
 /// <param name="Frame">프레임 이름(spec 6절 10개 중 하나)</param>
@@ -30,6 +31,14 @@ public static class MascotPlayback
         WorkPhase.Done => MascotMood.Dance,
         _ => MascotMood.Idle,   // BeforeLunch, Working
     };
+
+    /// 야근 중(done 이고 야근 분 ≥ 1)이면 포괄임금제 아님 → 화남, 포괄 → 욺. 야근 분 0 인 done 은 춤.
+    public static MascotMood MoodOf(WorkdaySnapshot s, PaySettings pay)
+    {
+        if (s.Phase == WorkPhase.Done && PayCalc.OvertimeMinutes(s.Overtime) >= 1)
+            return pay.Comprehensive ? MascotMood.Cry : MascotMood.Angry;
+        return MoodOf(s.Phase);
+    }
 
     public const double ZStepSeconds = 0.5;
     public const double ConfettiStepSeconds = 0.4;
@@ -63,6 +72,10 @@ public static class MascotPlayback
                 return new(Alternate(t, 0.4, MascotFrames.Eat1, MascotFrames.Eat2), MascotOverlay.None, 0, jump);
             case MascotMood.Sparkle:
                 return new(Alternate(t, 0.3, MascotFrames.Sparkle, MascotFrames.Hop), MascotOverlay.None, 0, jump);
+            case MascotMood.Angry:
+                return new(Alternate(t, 0.3, MascotFrames.Angry1, MascotFrames.Angry2), MascotOverlay.None, 0, jump);
+            case MascotMood.Cry:
+                return new(Alternate(t, 0.4, MascotFrames.Cry1, MascotFrames.Cry2), MascotOverlay.None, 0, jump);
             case MascotMood.Dance:
                 return new(Alternate(t, 0.4, MascotFrames.DanceL, MascotFrames.DanceR),
                     MascotOverlay.Confetti, Step(t, ConfettiStepSeconds), jump);

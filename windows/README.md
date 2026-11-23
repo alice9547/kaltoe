@@ -36,7 +36,7 @@ dotnet run --project Kaltoe.App
 데모 모드 — 가짜 데이터를 흘려 화면을 바로 확인한다(설정·기록 파일, 자동 실행 등록, 알림은 건드리지 않고, 실제 앱과 따로 돈다):
 
 ```sh
-Kaltoe.exe --demo waiting|beforelunch|lunch|working|almost|done [--style terminal|bubble] [--font-size 8..32]
+Kaltoe.exe --demo waiting|beforelunch|lunch|working|almost|done [--style terminal|bubble] [--font-size 8..32] [--comprehensive on|off]
 ```
 
 ## 단일 exe 배포
@@ -63,4 +63,5 @@ dotnet publish windows/Kaltoe.App -c Release -r win-x64 --self-contained true \
 - **알림**: `NotifyIcon.ShowBalloonTip`. 앱이 켜져 있는 동안 시각을 지나는 순간 한 번만(지난 지 5초가 넘은 건 띄우지 않음).
 - **자동 실행**: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Kaltoe`. 첫 실행 때 한 번 켠다.
 - **중복 실행 방지**: 이름 있는 뮤텍스. 이미 떠 있으면 조용히 종료.
+- **연장수당**: 야근 1분 이상이면 `pay.*` 설정(포괄임금제 기본 켜짐, 단가 비어 있으면 시간당 10,320원)으로 터미널 마지막 줄·말풍선·트레이 메뉴에 표시하고, 마스코트는 포괄 아님 → 화남, 포괄 → 욺. 데모는 `--demo done --comprehensive on|off` 로 확인.
 - **위젯 모양**: 터미널(기본) / 말풍선. 글자 크기 8~32px (위젯 전체 비율 = 글자 크기 / 12).

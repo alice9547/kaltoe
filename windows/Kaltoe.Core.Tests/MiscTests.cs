@@ -222,10 +222,32 @@ public class MascotTests
         Assert.Equal(step, p.OverlayStep);
     }
 
+    [Theory]
+    [InlineData(0.1, "angry1")]
+    [InlineData(0.4, "angry2")]
+    [InlineData(0.7, "angry1")]
+    public void Angry_Alternates0_3s_NoConfetti(double t, string expected)
+    {
+        var p = MascotPlayback.Resolve(MascotMood.Angry, t, null, 16);
+        Assert.Equal(expected, p.Frame);
+        Assert.Equal(MascotOverlay.None, p.Overlay);
+    }
+
+    [Theory]
+    [InlineData(0.1, "cry1")]
+    [InlineData(0.5, "cry2")]
+    [InlineData(0.9, "cry1")]
+    public void Cry_Alternates0_4s_NoConfetti(double t, string expected)
+    {
+        var p = MascotPlayback.Resolve(MascotMood.Cry, t, null, 16);
+        Assert.Equal(expected, p.Frame);
+        Assert.Equal(MascotOverlay.None, p.Overlay);
+    }
+
     [Fact]
     public void NonOverlayMoods_HaveNoOverlay()
     {
-        foreach (var m in new[] { MascotMood.Idle, MascotMood.Eat, MascotMood.Sparkle })
+        foreach (var m in new[] { MascotMood.Idle, MascotMood.Eat, MascotMood.Sparkle, MascotMood.Angry, MascotMood.Cry })
             Assert.Equal(MascotOverlay.None, MascotPlayback.Resolve(m, 1.0, null, 16).Overlay);
     }
 
@@ -235,7 +257,7 @@ public class MascotTests
         foreach (var mood in Enum.GetValues<MascotMood>())
             for (var t = 0.0; t < 9.0; t += 0.05)
                 Assert.Contains(MascotPlayback.Resolve(mood, t, null, 16).Frame, MascotFrames.All);
-        Assert.Equal(10, MascotFrames.All.Count);
+        Assert.Equal(14, MascotFrames.All.Count);
     }
 
     [Fact]

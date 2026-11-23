@@ -30,6 +30,18 @@ public sealed record NotifySettings
     public bool End { get; init; } = true;
 }
 
+public enum PayUnit { Hour, Minute }
+
+/// 포괄임금제·연장수당 단가 (docs/spec.md 5-3절). 연장수당은 참고용 표시.
+public sealed record PaySettings
+{
+    public bool Comprehensive { get; init; } = true;
+    /// 연장수당 단가(원). null(비어 있음)이면 최저시급(시간당 10320원)으로 계산한다. 허용 1~10000000.
+    public int? RateAmount { get; init; }
+    /// 단가의 단위(시간당/분당). RateAmount 가 null 이면 무시.
+    public PayUnit RateUnit { get; init; } = PayUnit.Hour;
+}
+
 public enum WidgetStyle { Terminal, Bubble }
 
 public sealed record WidgetSettings
@@ -49,6 +61,7 @@ public sealed record AppSettings
     public LunchSettings Lunch { get; init; } = new();
     public NotifySettings Notify { get; init; } = new();
     public WidgetSettings Widget { get; init; } = new();
+    public PaySettings Pay { get; init; } = new();
 
     public static AppSettings Default => new();
 }
@@ -78,6 +91,9 @@ public static class SettingsValidator
 
         if (s.Lunch.Enabled && s.Lunch.End <= s.Lunch.Start)
             return "점심 끝 시각은 시작 시각보다 뒤여야 합니다";
+
+        if (s.Pay.RateAmount is { } rate && !PayCalc.IsValidRate(rate))
+            return $"연장수당 단가는 {PayCalc.MinRate}~{PayCalc.MaxRate:N0}원 사이의 정수여야 합니다";
 
         if (!WidgetSizing.IsValidFontSize(s.Widget.FontSize))
             return $"글자 크기는 {WidgetSizing.MinFontSize}~{WidgetSizing.MaxFontSize}px 사이의 정수여야 합니다";
