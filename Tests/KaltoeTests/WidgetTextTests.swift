@@ -20,6 +20,10 @@ final class WidgetTextTests: XCTestCase {
 
     private func d(_ h: Int, _ m: Int, _ s: Int = 0) -> Date { TestCalendar.date(h, m, s) }
 
+    /// 포괄임금제 끔(연장수당 표시) / 켬(기본값).
+    private var normalPay: WorkSettings { var s = WorkSettings(); s.comprehensivePay = false; return s }
+    private var comprehensive: WorkSettings { var s = WorkSettings(); s.comprehensivePay = true; return s }
+
     private func snap(now: Date, clockIn: Date?, clockOut: Date?, lunch: (Date, Date)? = nil) -> WorkdaySnapshot {
         SnapshotCalculator.make(now: now, clockIn: clockIn, clockOut: clockOut, lunchStart: lunch?.0, lunchEnd: lunch?.1)
     }
@@ -120,8 +124,9 @@ final class WidgetTextTests: XCTestCase {
         let early = snap(now: d(18, 16, 59), clockIn: d(9, 16), clockOut: d(18, 16))
         XCTAssertEqual(plain(early), ["$ exit", "Process finished with exit code 0", "퇴근하세요! out 18:16"])
         let late = snap(now: d(18, 28, 30), clockIn: d(9, 16), clockOut: d(18, 16))
-        XCTAssertEqual(plain(late).last, "# 야근 중 +0h 12m")
-        XCTAssertEqual(plain(snap(now: d(18, 17), clockIn: d(9, 16), clockOut: d(18, 16))).count, 4, "정확히 60초면 표시")
+        XCTAssertEqual(plain(late, normalPay), ["$ exit", "Process finished with exit code 0", "퇴근하세요! out 18:16",
+                                                "# 야근 중 +0h 12m", "# 연장수당 +2,064원"])
+        XCTAssertEqual(plain(snap(now: d(18, 17), clockIn: d(9, 16), clockOut: d(18, 16))).count, 5, "정확히 60초면 야근 줄과 수당 줄 표시")
     }
 
     func testLineStyles_forNewPhases() {
@@ -197,7 +202,7 @@ final class WidgetTextTests: XCTestCase {
 
     // MARK: 말풍선 (spec 5-2절)
 
-    private func bubble(_ s: WorkdaySnapshot) -> String { WidgetText.bubbleText(for: s) }
+    private func bubble(_ s: WorkdaySnapshot, _ settings: WorkSettings = WorkSettings()) -> String { WidgetText.bubbleText(for: s, settings: settings) }
 
     func testBubble_allPhases() {
         let lunch = (d(11, 30), d(13, 0))
@@ -208,7 +213,7 @@ final class WidgetTextTests: XCTestCase {
         XCTAssertEqual(bubble(snap(now: d(15, 14, 59), clockIn: d(9, 16), clockOut: d(18, 16))), "퇴근 182분 전")       // 3h01m01s = 181분 01초 → 올림 182
         XCTAssertEqual(bubble(snap(now: d(18, 6, 55), clockIn: d(9, 16), clockOut: d(18, 16))), "퇴근 10분 전!")      // 9m05s → 10분
         XCTAssertEqual(bubble(snap(now: d(18, 16), clockIn: d(9, 16), clockOut: d(18, 16))), "퇴근하세요!")
-        XCTAssertEqual(bubble(snap(now: d(18, 28, 59), clockIn: d(9, 16), clockOut: d(18, 16))), "퇴근하세요! +12분")   // 내림
+        XCTAssertEqual(bubble(snap(now: d(18, 28, 59), clockIn: d(9, 16), clockOut: d(18, 16)), normalPay), "야근 12분 · +2,064원")   // 내림 + 연장수당
     }
 
     func testBubble_spec_examples() {
@@ -244,12 +249,12 @@ final class WidgetTextTests: XCTestCase {
 
     func testBubble_overtimeFloorsAndNeedsOneMinute() {
         let out = d(18, 16)
-        func done(_ over: TimeInterval) -> String { bubble(snap(now: out.addingTimeInterval(over), clockIn: d(9, 16), clockOut: out)) }
+        func done(_ over: TimeInterval) -> String { bubble(snap(now: out.addingTimeInterval(over), clockIn: d(9, 16), clockOut: out), normalPay) }
         XCTAssertEqual(done(0), "퇴근하세요!")
         XCTAssertEqual(done(59), "퇴근하세요!")
-        XCTAssertEqual(done(60), "퇴근하세요! +1분")
-        XCTAssertEqual(done(119), "퇴근하세요! +1분")
-        XCTAssertEqual(done(120), "퇴근하세요! +2분")
+        XCTAssertEqual(done(60), "야근 1분 · +172원")
+        XCTAssertEqual(done(119), "야근 1분 · +172원")
+        XCTAssertEqual(done(120), "야근 2분 · +344원")
     }
 
     func testBubble_fixedWaitingRoundsUp() {
@@ -267,5 +272,152 @@ final class WidgetTextTests: XCTestCase {
         XCTAssertEqual(ScaledMascot.cellSize(baseSize: 60, ratio: 2, gridWidth: 20), 6)
         XCTAssertEqual(ScaledMascot.cellSize(baseSize: 60, ratio: 32.0 / 12, gridWidth: 20), 8)   // 160pt
         XCTAssertEqual(ScaledMascot.cellSize(baseSize: 1, ratio: 0.1, gridWidth: 20), 1, "최소 1칸")
+    }
+
+    // MARK: 연장수당 (spec 5-3절, 기본 = 시간당 10,320원)
+
+    private func doneSnap(overMinutes: Double, extraSeconds: Double = 0) -> WorkdaySnapshot {
+        let out = d(18, 16)
+        return snap(now: out.addingTimeInterval(overMinutes * 60 + extraSeconds), clockIn: d(9, 16), clockOut: out)
+    }
+
+    func testPay_defaultIsComprehensive() {
+        XCTAssertTrue(WorkSettings().comprehensivePay)
+        XCTAssertEqual(plain(doneSnap(overMinutes: 12)).last, "# 포괄이라 0원 (원래 +2,064원)")
+    }
+
+    func testPay_terminalLastLine() {
+        let s = doneSnap(overMinutes: 12)
+        XCTAssertEqual(plain(s, normalPay), ["$ exit", "Process finished with exit code 0", "퇴근하세요! out 18:16",
+                                             "# 야근 중 +0h 12m", "# 연장수당 +2,064원"])
+        XCTAssertEqual(plain(s, comprehensive), ["$ exit", "Process finished with exit code 0", "퇴근하세요! out 18:16",
+                                                 "# 야근 중 +0h 12m", "# 포괄이라 0원 (원래 +2,064원)"])
+        XCTAssertEqual(plain(s, normalPay).count, 5, "working 단계와 같은 5줄")
+    }
+
+    func testPay_terminalAccentSpans() {
+        let normal = WidgetText.lines(for: doneSnap(overMinutes: 12), settings: normalPay).last!
+        XCTAssertEqual(normal.spans.filter { $0.style == .accent }.map(\.text), ["+2,064원"])
+        let flat = WidgetText.lines(for: doneSnap(overMinutes: 12), settings: comprehensive).last!
+        XCTAssertEqual(flat.spans.filter { $0.style == .accent }.map(\.text), ["0원"])
+    }
+
+    func testPay_noPayTextBelowOneMinute() {
+        for s in [doneSnap(overMinutes: 0), doneSnap(overMinutes: 0, extraSeconds: 59)] {
+            for settings in [normalPay, comprehensive] {
+                XCTAssertEqual(plain(s, settings), ["$ exit", "Process finished with exit code 0", "퇴근하세요! out 18:16"])
+                XCTAssertEqual(WidgetText.bubbleText(for: s, settings: settings), "퇴근하세요!")
+                XCTAssertNil(WidgetText.overtimePayMenuTitle(for: s, settings: settings))
+            }
+        }
+    }
+
+    func testPay_bubble() {
+        let s = doneSnap(overMinutes: 12)
+        XCTAssertEqual(WidgetText.bubbleText(for: s, settings: normalPay), "야근 12분 · +2,064원")
+        XCTAssertEqual(WidgetText.bubbleText(for: s, settings: comprehensive), "야근 12분 · 0원 (포괄)")
+    }
+
+    func testPay_menuItem() {
+        let s = doneSnap(overMinutes: 12)
+        XCTAssertEqual(WidgetText.overtimePayMenuTitle(for: s, settings: normalPay), "연장수당 +2,064원")
+        XCTAssertEqual(WidgetText.overtimePayMenuTitle(for: s, settings: comprehensive), "연장수당 0원 (포괄)")
+    }
+
+    func testPay_notShownBeforeDone() {
+        let working = snap(now: d(15, 0), clockIn: d(9, 16), clockOut: d(18, 16))
+        XCTAssertNil(WidgetText.overtimePayMenuTitle(for: working, settings: normalPay))
+        XCTAssertNil(OvertimePay.display(for: working, settings: normalPay))
+    }
+
+    func testPay_menuBarLineUnchanged() {
+        XCTAssertEqual(WidgetText.menuBarTitle(for: doneSnap(overMinutes: 12)), "퇴근! +12m")
+    }
+
+    func testPay_customRates() {
+        var perMinute = normalPay; perMinute.rateAmount = 300; perMinute.rateUnit = .minute
+        XCTAssertEqual(WidgetText.bubbleText(for: doneSnap(overMinutes: 12), settings: perMinute), "야근 12분 · +3,600원")
+        var perHour = normalPay; perHour.rateAmount = 20000; perHour.rateUnit = .hour
+        XCTAssertEqual(WidgetText.bubbleText(for: doneSnap(overMinutes: 12), settings: perHour), "야근 12분 · +4,000원")
+        perHour.comprehensivePay = true
+        XCTAssertEqual(plain(doneSnap(overMinutes: 12), perHour).last, "# 포괄이라 0원 (원래 +4,000원)")
+    }
+
+    // MARK: 마스코트 기분 (spec 6절)
+
+    func testMood_overtimeDecidesAngryOrCry() {
+        let overtime = doneSnap(overMinutes: 12)
+        XCTAssertEqual(MascotMood.resolve(overtime, settings: normalPay), .angry)
+        XCTAssertEqual(MascotMood.resolve(overtime, settings: comprehensive), .cry)
+        XCTAssertEqual(MascotMood.resolve(doneSnap(overMinutes: 1), settings: normalPay), .angry)
+        XCTAssertEqual(MascotMood.resolve(doneSnap(overMinutes: 1), settings: comprehensive), .cry)
+    }
+
+    func testMood_doneWithoutOvertimeStillDances() {
+        for s in [doneSnap(overMinutes: 0), doneSnap(overMinutes: 0, extraSeconds: 59)] {
+            XCTAssertEqual(MascotMood.resolve(s, settings: normalPay), .dance)
+            XCTAssertEqual(MascotMood.resolve(s, settings: comprehensive), .dance)
+        }
+    }
+
+    func testMood_otherPhasesFollowPhase() {
+        let working = snap(now: d(15, 0), clockIn: d(9, 16), clockOut: d(18, 16))
+        XCTAssertEqual(MascotMood.resolve(working, settings: comprehensive), .idle)
+        let almost = snap(now: d(18, 10), clockIn: d(9, 16), clockOut: d(18, 16))
+        XCTAssertEqual(MascotMood.resolve(almost, settings: normalPay), .sparkle)
+        let waiting = snap(now: d(8, 0), clockIn: nil, clockOut: nil)
+        XCTAssertEqual(MascotMood.resolve(waiting, settings: normalPay), .sleep)
+    }
+}
+
+/// 연장수당 계산·표기 순수 함수.
+final class OvertimePayTests: XCTestCase {
+    private func pay(_ minutes: Int, _ amount: Int? = nil, _ unit: PayRateUnit = .hour) -> Int {
+        OvertimePay.amount(overtimeMinutes: minutes, rateAmount: amount, rateUnit: unit)
+    }
+
+    func testAmount_defaultIsMinimumHourlyWage() {
+        XCTAssertEqual(pay(0), 0)
+        XCTAssertEqual(pay(1), 172)          // 10320 / 60
+        XCTAssertEqual(pay(12), 2064)
+        XCTAssertEqual(pay(60), 10320)
+        XCTAssertEqual(pay(80), 13760)
+        XCTAssertEqual(pay(1, nil, .minute), 172, "단가가 비면 단위 설정은 무시")
+    }
+
+    func testAmount_perMinute() {
+        XCTAssertEqual(pay(12, 300, .minute), 3600)
+        XCTAssertEqual(pay(1, 1, .minute), 1)
+        XCTAssertEqual(pay(0, 300, .minute), 0)
+    }
+
+    func testAmount_perHour_floors() {
+        XCTAssertEqual(pay(12, 20000, .hour), 4000)
+        XCTAssertEqual(pay(1, 59, .hour), 0)           // 59/60 → 0
+        XCTAssertEqual(pay(1, 60, .hour), 1)
+        XCTAssertEqual(pay(7, 10001, .hour), 1166)     // 70007/60 = 1166.78
+        XCTAssertEqual(pay(60, 10_000_000, .hour), 10_000_000)
+    }
+
+    func testAmount_noMultiplier() {
+        XCTAssertEqual(pay(60, 10320, .hour), 10320, "가산율 1.5 를 곱하지 않는다")
+    }
+
+    func testOvertimeMinutes_floor() {
+        XCTAssertEqual(OvertimePay.overtimeMinutes(0), 0)
+        XCTAssertEqual(OvertimePay.overtimeMinutes(59.9), 0)
+        XCTAssertEqual(OvertimePay.overtimeMinutes(60), 1)
+        XCTAssertEqual(OvertimePay.overtimeMinutes(119.9), 1)
+        XCTAssertEqual(OvertimePay.overtimeMinutes(-5), 0)
+    }
+
+    func testWon_commas() {
+        XCTAssertEqual(OvertimePay.won(0), "0원")
+        XCTAssertEqual(OvertimePay.won(172), "172원")
+        XCTAssertEqual(OvertimePay.won(999), "999원")
+        XCTAssertEqual(OvertimePay.won(1000), "1,000원")
+        XCTAssertEqual(OvertimePay.won(2064), "2,064원")
+        XCTAssertEqual(OvertimePay.won(10320), "10,320원")
+        XCTAssertEqual(OvertimePay.won(1_500_000), "1,500,000원")
     }
 }

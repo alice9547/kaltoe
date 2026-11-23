@@ -54,12 +54,12 @@ struct BubbleWidgetView: View {
         let tail = 3 * step
         let window = Self.size(fontSize: settings.settings.fontSize)
         return ZStack(alignment: .bottomTrailing) {
-            ScaledMascot(mood: MascotMood(phase: snap.phase), tick: clock.tick, jumpStart: clock.jumpStart,
+            ScaledMascot(mood: MascotMood.resolve(snap, settings: settings.settings), tick: clock.tick, jumpStart: clock.jumpStart,
                          outline: true, baseSize: Self.baseMascot, ratio: k, onTap: { clock.jump() })
                 .padding(.trailing, 2 * k)
                 .padding(.bottom, 2 * k)
 
-            Text(WidgetText.bubbleText(for: snap))
+            Text(WidgetText.bubbleText(for: snap, settings: settings.settings))
                 .font(.system(size: CGFloat(settings.settings.fontSize + 1), weight: .medium))
                 .foregroundColor(Color(hex: 0x1B1B1F))
                 .lineLimit(1)

@@ -127,7 +127,18 @@ enum WidgetText {
                 out("Process finished with exit code 0", .success),
                 out("퇴근하세요! out \(clock(s.clockOut))"),
             ]
-            if s.overtime >= 60 { result.append(out("# 야근 중 \(overtime(s.overtime))", .comment)) }
+            if let pay = OvertimePay.display(for: s, settings: settings) {
+                // 야근 줄은 그대로 두고 그 아래에 수당 줄을 따로 둔다 (총 5줄, spec 5-3절).
+                result.append(out("# 야근 중 \(overtime(s.overtime))", .comment))
+                if pay.comprehensive {
+                    result.append(line(TextSpan(text: "# 포괄이라 ", style: .comment),
+                                       TextSpan(text: OvertimePay.won(0), style: .accent),
+                                       TextSpan(text: " (원래 +\(OvertimePay.won(pay.amount)))", style: .comment)))
+                } else {
+                    result.append(line(TextSpan(text: "# 연장수당 ", style: .comment),
+                                       TextSpan(text: "+\(OvertimePay.won(pay.amount))", style: .accent)))
+                }
+            }
             return result
         case .waiting:
             // 고정 모드는 목표(출근 시각)가 있다. 유동 모드는 earliestStart 이후 첫 잠금 해제를 기다린다.
@@ -166,7 +177,7 @@ enum WidgetText {
     }
 
     /// 말풍선 한 줄 문구.
-    static func bubbleText(for s: WorkdaySnapshot) -> String {
+    static func bubbleText(for s: WorkdaySnapshot, settings: WorkSettings = .default) -> String {
         let minutes = ceilMinutes(s.remaining)
         switch s.phase {
         case .waiting:
@@ -176,7 +187,11 @@ enum WidgetText {
         case .working: return "퇴근 \(minutes)분 전"
         case .almostDone: return "퇴근 \(minutes)분 전!"
         case .done:
-            return s.overtime >= 60 ? "퇴근하세요! +\(Int(s.overtime) / 60)분" : "퇴근하세요!"
+            // 야근 1분 이상이면 연장수당 문구로 바뀐다 (5-3절).
+            guard let pay = OvertimePay.display(for: s, settings: settings) else { return "퇴근하세요!" }
+            return pay.comprehensive
+                ? "야근 \(pay.minutes)분 · \(OvertimePay.won(0)) (포괄)"
+                : "야근 \(pay.minutes)분 · +\(OvertimePay.won(pay.amount))"
         }
     }
 
@@ -189,6 +204,12 @@ enum WidgetText {
     /// 출근이 없으면 nil (항목을 표시하지 않는다).
     static func clockOutMenuTitle(for s: WorkdaySnapshot) -> String? {
         s.clockIn == nil || s.clockOut == nil ? nil : "퇴근 \(clock(s.clockOut))"
+    }
+
+    /// done 이고 야근 1분 이상일 때만 (퇴근 줄 아래 비활성 항목).
+    static func overtimePayMenuTitle(for s: WorkdaySnapshot, settings: WorkSettings) -> String? {
+        guard let pay = OvertimePay.display(for: s, settings: settings) else { return nil }
+        return pay.comprehensive ? "연장수당 \(OvertimePay.won(0)) (포괄)" : "연장수당 +\(OvertimePay.won(pay.amount))"
     }
 
     /// `lunch.enabled` 일 때만 (설정 기준 — 유효 여부와 무관).

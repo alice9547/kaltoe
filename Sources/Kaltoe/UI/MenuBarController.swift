@@ -58,6 +58,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(info(WidgetText.clockInMenuTitle(for: snap)))
         if let out = WidgetText.clockOutMenuTitle(for: snap) { menu.addItem(info(out)) }
+        if let pay = WidgetText.overtimePayMenuTitle(for: snap, settings: settings.settings) { menu.addItem(info(pay)) }
         if let lunch = WidgetText.lunchMenuTitle(for: settings.settings) { menu.addItem(info(lunch)) }
         menu.addItem(.separator())
 

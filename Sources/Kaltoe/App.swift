@@ -46,6 +46,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             settings.update(s, persist: false)
         }
 
+        // 확인용: `--comprehensive [on|off]` 는 저장 없이 이번 실행에만 포괄임금제를 켜거나(기본 on) 끈다.
+        if let i = CommandLine.arguments.firstIndex(of: "--comprehensive") {
+            var s = settings.settings
+            let next = CommandLine.arguments.indices.contains(i + 1) ? CommandLine.arguments[i + 1] : "on"
+            s.comprehensivePay = next != "off"
+            settings.update(s, persist: false)
+        }
+
         // 확인용: `--style terminal|bubble` 도 저장 없이 이번 실행에만 모양을 바꾼다.
         if let i = CommandLine.arguments.firstIndex(of: "--style"),
            CommandLine.arguments.indices.contains(i + 1),

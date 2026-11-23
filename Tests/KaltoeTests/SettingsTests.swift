@@ -23,6 +23,9 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(s.notifyLunch && s.notifyBeforeEnd && s.notifyEnd)
         XCTAssertEqual(s.fontSize, 12)
         XCTAssertEqual(s.widgetStyle, .terminal)
+        XCTAssertTrue(s.comprehensivePay)
+        XCTAssertNil(s.rateAmount)
+        XCTAssertEqual(s.rateUnit, .hour)
         XCTAssertEqual(SettingsStore(defaults: defaults).settings, s)
     }
 
@@ -109,7 +112,7 @@ final class SettingsTests: XCTestCase {
     }
 
     func testValidation_errorsHaveMessages() {
-        for e in [SettingsError.workMinutesOutOfRange, .fixedEndNotAfterStart, .lunchEndNotAfterStart, .fontSizeOutOfRange, .fontSizeNotANumber] {
+        for e in [SettingsError.workMinutesOutOfRange, .fixedEndNotAfterStart, .lunchEndNotAfterStart, .fontSizeOutOfRange, .fontSizeNotANumber, .rateAmountOutOfRange, .rateAmountNotANumber] {
             XCTAssertFalse(e.message.isEmpty)
         }
     }
@@ -185,5 +188,51 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(WidgetController.windowSize(style: .terminal, fontSize: 12), CGSize(width: 320, height: 150))
         XCTAssertEqual(WidgetController.windowSize(style: .bubble, fontSize: 12), CGSize(width: 190, height: 120))
         XCTAssertEqual(WidgetController.windowSize(style: .bubble, fontSize: 24), CGSize(width: 380, height: 240))
+    }
+
+    // MARK: 야근 (pay.*)
+
+    func testValidation_rateAmountBounds() {
+        var s = WorkSettings()
+        s.rateAmount = nil
+        XCTAssertEqual(SettingsValidator.validate(s), [], "비워 두기 허용")
+        for ok in [1, 2, 10320, 9_999_999, 10_000_000] { s.rateAmount = ok; XCTAssertEqual(SettingsValidator.validate(s), [], "\(ok)") }
+        for bad in [0, -1, 10_000_001, 99_999_999] {
+            s.rateAmount = bad
+            XCTAssertEqual(SettingsValidator.validate(s), [.rateAmountOutOfRange], "\(bad)")
+        }
+    }
+
+    func testParseRateAmount() {
+        XCTAssertEqual(try? SettingsValidator.parseRateAmount("300").get(), 300)
+        XCTAssertEqual(try? SettingsValidator.parseRateAmount(" 20000 ").get(), 20000)
+        XCTAssertEqual(try? SettingsValidator.parseRateAmount("10000001").get(), 10_000_001, "범위 검사는 validate 의 몫")
+        XCTAssertEqual(SettingsValidator.parseRateAmount(""), .success(nil))
+        XCTAssertEqual(SettingsValidator.parseRateAmount("   "), .success(nil))
+        for bad in ["abc", "10,320", "1.5", "-1", "300원", "99999999999999999999"] {
+            XCTAssertEqual(SettingsValidator.parseRateAmount(bad), .failure(.rateAmountNotANumber), "'\(bad)'")
+        }
+    }
+
+    func testPaySettings_saveLoadAndRejectInvalid() {
+        let store = SettingsStore(defaults: defaults)
+        var s = store.settings; s.comprehensivePay = false; s.rateAmount = 300; s.rateUnit = .minute
+        XCTAssertEqual(store.update(s), [])
+        XCTAssertEqual(defaults.object(forKey: "settings.pay.comprehensive") as? Bool, false)
+        XCTAssertEqual(defaults.object(forKey: "settings.pay.rateAmount") as? Int, 300)
+        XCTAssertEqual(defaults.string(forKey: "settings.pay.rateUnit"), "minute")
+        let reloaded = SettingsStore(defaults: defaults).settings
+        XCTAssertFalse(reloaded.comprehensivePay); XCTAssertEqual(reloaded.rateAmount, 300); XCTAssertEqual(reloaded.rateUnit, .minute)
+        s.rateAmount = 0
+        XCTAssertEqual(store.update(s), [.rateAmountOutOfRange])
+        XCTAssertEqual(store.settings.rateAmount, 300)
+        // 비우면 키가 지워지고 다시 읽어도 비어 있다.
+        s.rateAmount = nil
+        XCTAssertEqual(store.update(s), [])
+        XCTAssertNil(defaults.object(forKey: "settings.pay.rateAmount"))
+        XCTAssertNil(SettingsStore(defaults: defaults).settings.rateAmount)
+        // 손으로 망가뜨린 저장값은 비움(최저시급)으로 되돌린다.
+        defaults.set(-5, forKey: "settings.pay.rateAmount")
+        XCTAssertNil(SettingsStore(defaults: defaults).settings.rateAmount)
     }
 }

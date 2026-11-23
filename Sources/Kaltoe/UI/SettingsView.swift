@@ -14,6 +14,8 @@ struct SettingsView: View {
     @State private var fontText: String
     /// 입력칸이 숫자가 아닐 때만 켜진다 (이때는 저장하지 않는다).
     @State private var fontTextError: SettingsError?
+    @State private var wageText: String
+    @State private var wageTextError: SettingsError?
 
     init(store: WorkdayStore, settingsStore: SettingsStore, actions: AppActions,
          detectedClockIn: @escaping () -> Date?) {
@@ -24,6 +26,7 @@ struct SettingsView: View {
         _draft = State(initialValue: settingsStore.settings)
         _launchAtLogin = State(initialValue: actions.isLaunchAtLoginEnabled())
         _fontText = State(initialValue: String(settingsStore.settings.fontSize))
+        _wageText = State(initialValue: settingsStore.settings.rateAmount.map(String.init) ?? "")
     }
 
     var body: some View {
@@ -61,6 +64,28 @@ struct SettingsView: View {
                 Toggle("점심 시작", isOn: $draft.notifyLunch).disabled(!draft.lunchEnabled)
                 Toggle("퇴근 10분 전", isOn: $draft.notifyBeforeEnd)
                 Toggle("퇴근 정각", isOn: $draft.notifyEnd)
+            }
+
+            Divider()
+            section("야근") {
+                Toggle("포괄임금제", isOn: $draft.comprehensivePay)
+                row("연장수당 단가") {
+                    TextField("최저시급 10,320", text: $wageText)
+                        .textFieldStyle(.roundedBorder)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 120)
+                        .onChange(of: wageText) { _, text in applyWageText(text) }
+                    Text("원").foregroundColor(.secondary)
+                    Picker("", selection: $draft.rateUnit) {
+                        Text("시간당").tag(PayRateUnit.hour)
+                        Text("분당").tag(PayRateUnit.minute)
+                    }
+                    .labelsHidden()
+                    .frame(width: 80)
+                    .disabled(draft.rateAmount == nil)
+                }
+                Text("비워 두면 최저시급(시간당 10,320원)으로 계산합니다. 참고용 금액입니다.")
+                    .font(.system(size: 11)).foregroundColor(.secondary)
             }
 
             Divider()
@@ -110,7 +135,7 @@ struct SettingsView: View {
 
     // MARK: 글자 크기 입력
 
-    private var shownErrors: [SettingsError] { (fontTextError.map { [$0] } ?? []) + errors }
+    private var shownErrors: [SettingsError] { [fontTextError, wageTextError].compactMap { $0 } + errors }
 
     /// 숫자가 아니면 오류만 보이고 저장하지 않는다. 숫자면 초안에 넣고(범위 검사는 검증기가) 즉시 반영한다.
     private func applyFontText(_ text: String) {
@@ -119,6 +144,16 @@ struct SettingsView: View {
         case .success(let v):
             fontTextError = nil
             if draft.fontSize != v { draft.fontSize = v }
+        }
+    }
+
+    /// 단가 입력칸: 비우면 최저시급, 숫자가 아니면 오류만 보이고 저장하지 않는다. 범위는 검증기가 본다.
+    private func applyWageText(_ text: String) {
+        switch SettingsValidator.parseRateAmount(text) {
+        case .failure(let e): wageTextError = e
+        case .success(let v):
+            wageTextError = nil
+            if draft.rateAmount != v { draft.rateAmount = v }
         }
     }
 

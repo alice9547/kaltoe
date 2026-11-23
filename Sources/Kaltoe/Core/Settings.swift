@@ -42,6 +42,11 @@ enum WidgetStyle: String, Equatable {
     case terminal, bubble
 }
 
+/// 연장수당 단가의 단위 (docs/spec.md 1절 `pay.rateUnit`).
+enum PayRateUnit: String, Equatable {
+    case hour, minute
+}
+
 struct WorkSettings: Equatable {
     var mode: WorkMode = .flexible
     var earliestStart = TimeOfDay(9, 0)
@@ -58,9 +63,18 @@ struct WorkSettings: Equatable {
     var fontSize = 12
     /// 위젯 모양: 터미널 창 / 말풍선(데스크톱 펫).
     var widgetStyle: WidgetStyle = .terminal
+    /// 포괄임금제 여부(기본 켜짐). 켜면 연장수당을 0원으로 표시한다.
+    var comprehensivePay = true
+    /// 연장수당 단가(원). nil 이면 최저시급(시간당 10320원)으로 계산한다.
+    var rateAmount: Int? = nil
+    /// 단가의 단위. `rateAmount` 가 nil 이면 무시.
+    var rateUnit: PayRateUnit = .hour
 
     static let fontSizeRange = 8...32
     static let baseFontSize = 12
+    static let rateAmountRange = 1...10_000_000
+    /// `rateAmount` 가 비어 있을 때의 시간당 단가 (2026년 최저시급).
+    static let defaultHourlyRate = 10320
     static let workMinutesRange = 60...960
     static let `default` = WorkSettings()
 }
@@ -72,6 +86,8 @@ enum SettingsError: Error, Equatable {
     case lunchEndNotAfterStart
     case fontSizeOutOfRange
     case fontSizeNotANumber
+    case rateAmountOutOfRange
+    case rateAmountNotANumber
 
     var message: String {
         switch self {
@@ -80,6 +96,8 @@ enum SettingsError: Error, Equatable {
         case .lunchEndNotAfterStart: return "점심 끝은 점심 시작보다 뒤여야 합니다."
         case .fontSizeOutOfRange: return "글자 크기는 8 ~ 32 사이여야 합니다."
         case .fontSizeNotANumber: return "글자 크기는 숫자로 입력해 주세요."
+        case .rateAmountOutOfRange: return "연장수당 단가는 1 ~ 10,000,000원 사이여야 합니다."
+        case .rateAmountNotANumber: return "연장수당 단가는 숫자로 입력하거나 비워 두세요."
         }
     }
 }
@@ -97,6 +115,7 @@ enum SettingsValidator {
         }
         if s.lunchEnabled, !(s.lunchStart < s.lunchEnd) { errors.append(.lunchEndNotAfterStart) }
         if !WorkSettings.fontSizeRange.contains(s.fontSize) { errors.append(.fontSizeOutOfRange) }
+        if let r = s.rateAmount, !WorkSettings.rateAmountRange.contains(r) { errors.append(.rateAmountOutOfRange) }
         return errors
     }
 
@@ -106,6 +125,17 @@ enum SettingsValidator {
         let t = text.trimmingCharacters(in: .whitespaces)
         guard !t.isEmpty, t.allSatisfy({ $0.isASCII && $0.isNumber }), let v = Int(t) else {
             return .failure(.fontSizeNotANumber)
+        }
+        return .success(v)
+    }
+
+    /// 설정 화면의 연장수당 단가 입력칸 문자열 → 값. 비어 있으면 `.success(nil)`(최저시급 사용),
+    /// 숫자가 아니면 `.rateAmountNotANumber`. (범위 검사는 `validate`.)
+    static func parseRateAmount(_ text: String) -> Result<Int?, SettingsError> {
+        let t = text.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty { return .success(nil) }
+        guard t.count <= 9, t.allSatisfy({ $0.isASCII && $0.isNumber }), let v = Int(t) else {
+            return .failure(.rateAmountNotANumber)
         }
         return .success(v)
     }
@@ -127,6 +157,9 @@ enum SettingsKey {
     static let notifyEnd = prefix + "notify.end"
     static let fontSize = prefix + "widget.fontSize"
     static let widgetStyle = prefix + "widget.style"
+    static let comprehensivePay = prefix + "pay.comprehensive"
+    static let rateAmount = prefix + "pay.rateAmount"
+    static let rateUnit = prefix + "pay.rateUnit"
 }
 
 /// 설정 저장소. 바뀌면 `settings` 를 구독하는 쪽(엔진·화면)이 즉시 반영한다. 메인 스레드에서 쓴다.
@@ -173,6 +206,9 @@ final class SettingsStore: ObservableObject {
         s.notifyBeforeEnd = flag(SettingsKey.notifyBeforeEnd, s.notifyBeforeEnd)
         s.notifyEnd = flag(SettingsKey.notifyEnd, s.notifyEnd)
         if let v = d.object(forKey: SettingsKey.fontSize) as? Int { s.fontSize = v }
+        s.comprehensivePay = flag(SettingsKey.comprehensivePay, s.comprehensivePay)
+        s.rateAmount = d.object(forKey: SettingsKey.rateAmount) as? Int
+        s.rateUnit = d.string(forKey: SettingsKey.rateUnit).flatMap(PayRateUnit.init(rawValue:)) ?? s.rateUnit
         s.widgetStyle = d.string(forKey: SettingsKey.widgetStyle).flatMap(WidgetStyle.init(rawValue:)) ?? s.widgetStyle
 
         // 손으로 고친 값 등으로 저장값이 잘못됐으면 해당 항목만 기본값으로 되돌린다.
@@ -186,7 +222,8 @@ final class SettingsStore: ObservableObject {
                 s.lunchStart = WorkSettings.default.lunchStart
                 s.lunchEnd = WorkSettings.default.lunchEnd
             case .fontSizeOutOfRange: s.fontSize = WorkSettings.default.fontSize
-            case .fontSizeNotANumber: break
+            case .fontSizeNotANumber, .rateAmountNotANumber: break
+            case .rateAmountOutOfRange: s.rateAmount = nil
             }
         }
         return s
@@ -206,5 +243,8 @@ final class SettingsStore: ObservableObject {
         d.set(s.notifyEnd, forKey: SettingsKey.notifyEnd)
         d.set(s.fontSize, forKey: SettingsKey.fontSize)
         d.set(s.widgetStyle.rawValue, forKey: SettingsKey.widgetStyle)
+        d.set(s.comprehensivePay, forKey: SettingsKey.comprehensivePay)
+        if let r = s.rateAmount { d.set(r, forKey: SettingsKey.rateAmount) } else { d.removeObject(forKey: SettingsKey.rateAmount) }
+        d.set(s.rateUnit.rawValue, forKey: SettingsKey.rateUnit)
     }
 }
