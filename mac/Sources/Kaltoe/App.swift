@@ -15,6 +15,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private struct IconSetting: Equatable { var character: MascotCharacter; var customPhoto: Bool }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 새 버전으로 갈아타기 (docs/spec.md 8절): 데모가 아니면 다른 칼퇴를 정리하고, 더 새 버전이 떠 있으면 내가 빠진다.
+        if DemoMode.fromArguments() == nil, !Handoff.run() {
+            NSApp.terminate(nil)
+            return
+        }
+
         var actions = AppActions()
         actions.isLaunchAtLoginEnabled = { LoginItem.isEnabled }
         actions.setLaunchAtLogin = { LoginItem.setEnabled($0) }
