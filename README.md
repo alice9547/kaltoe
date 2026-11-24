@@ -72,6 +72,20 @@ xattr -dr com.apple.quarantine /Applications/Kaltoe.app && open /Applications/Ka
 - **메뉴 열기**: 위젯을 오른쪽 클릭합니다. 맥은 메뉴바 아이콘, 윈도우는 트레이 아이콘을 오른쪽 클릭해도 같은 메뉴가 나옵니다. (윈도우에서 왼쪽 클릭은 위젯 보이기/숨기기입니다.)
 - **강아지**: 누르면 한 번 뜁니다. 출근 전엔 자고, 점심엔 밥을 먹고, 퇴근 10분 전엔 눈이 반짝이고, 퇴근하면 춤춥니다. 야근이 1분을 넘기면 포괄임금제일 땐 울고, 아닐 땐 화를 냅니다.
 
+### 상태별 화면
+
+위젯 모양은 설정에서 **터미널**과 **말풍선** 중에 고를 수 있습니다. 아래 시각은 데모 화면이라 실제와 다릅니다.
+
+| 상태 | 언제 | 터미널 | 말풍선 |
+|---|---|---|---|
+| **출근 전** | 아직 출근이 안 잡혔을 때 (유동: 기준 시각 이후 첫 잠금 해제 전 / 고정: 출근 시각 전) | <img src="docs/screenshots/terminal-waiting.png" width="300" alt="출근 전 터미널"> | <img src="docs/screenshots/bubble-waiting.png" width="180" alt="출근 전 말풍선"> |
+| **점심 전** | 점심시간을 켰을 때, 점심까지 남은 시간 | <img src="docs/screenshots/terminal-beforelunch.png" width="300" alt="점심 전 터미널"> | <img src="docs/screenshots/bubble-beforelunch.png" width="180" alt="점심 전 말풍선"> |
+| **점심시간** | 점심이 끝날 때까지 남은 시간 | <img src="docs/screenshots/terminal-lunch.png" width="300" alt="점심시간 터미널"> | <img src="docs/screenshots/bubble-lunch.png" width="180" alt="점심시간 말풍선"> |
+| **근무 중** | 퇴근까지 남은 시간과 진행률 | <img src="docs/screenshots/terminal-working.png" width="300" alt="근무 중 터미널"> | <img src="docs/screenshots/bubble-working.png" width="180" alt="근무 중 말풍선"> |
+| **퇴근 임박** | 퇴근 10분 전부터 | <img src="docs/screenshots/terminal-almost.png" width="300" alt="퇴근 임박 터미널"> | <img src="docs/screenshots/bubble-almost.png" width="180" alt="퇴근 임박 말풍선"> |
+| **퇴근** | 퇴근 시각이 지났을 때 (포괄임금제 켬, 기본값) | <img src="docs/screenshots/terminal-done.png" width="300" alt="퇴근 터미널"> | <img src="docs/screenshots/bubble-done.png" width="180" alt="퇴근 말풍선"> |
+| **야근** | 퇴근 후 포괄임금제를 끄면 야근 시간과 연장수당이 보이고 캐릭터가 화남 | <img src="docs/screenshots/terminal-overtime.png" width="300" alt="야근 터미널"> | <img src="docs/screenshots/bubble-overtime.png" width="180" alt="야근 말풍선"> |
+
 ### 설정
 
 메뉴에서 `설정…`을 누르면 창이 열립니다. 값을 바꾸면 바로 적용됩니다.
