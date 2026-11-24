@@ -86,6 +86,20 @@ xattr -dr com.apple.quarantine /Applications/Kaltoe.app && open /Applications/Ka
 | **퇴근** | 퇴근 시각이 지났을 때 (포괄임금제 켬, 기본값) | <img src="docs/screenshots/terminal-done.png" width="300" alt="퇴근 터미널"> | <img src="docs/screenshots/bubble-done.png" width="180" alt="퇴근 말풍선"> |
 | **야근** | 퇴근 후 포괄임금제를 끄면 야근 시간과 연장수당이 보이고 캐릭터가 화남 | <img src="docs/screenshots/terminal-overtime.png" width="300" alt="야근 터미널"> | <img src="docs/screenshots/bubble-overtime.png" width="180" alt="야근 말풍선"> |
 
+#### 실사 강아지 캐릭터
+
+설정의 캐릭터에서 **실사**를 고르면 강아지 사진이 그대로 나옵니다. 사용자 지정 사진을 넣으면 그 사진으로 바뀝니다.
+
+| 상태 | 터미널 | 말풍선 |
+|---|---|---|
+| **출근 전** | <img src="docs/screenshots/photo-terminal-waiting.png" width="300" alt="출근 전 실사 터미널"> | <img src="docs/screenshots/photo-bubble-waiting.png" width="180" alt="출근 전 실사 말풍선"> |
+| **점심 전** | <img src="docs/screenshots/photo-terminal-beforelunch.png" width="300" alt="점심 전 실사 터미널"> | <img src="docs/screenshots/photo-bubble-beforelunch.png" width="180" alt="점심 전 실사 말풍선"> |
+| **점심시간** | <img src="docs/screenshots/photo-terminal-lunch.png" width="300" alt="점심시간 실사 터미널"> | <img src="docs/screenshots/photo-bubble-lunch.png" width="180" alt="점심시간 실사 말풍선"> |
+| **근무 중** | <img src="docs/screenshots/photo-terminal-working.png" width="300" alt="근무 중 실사 터미널"> | <img src="docs/screenshots/photo-bubble-working.png" width="180" alt="근무 중 실사 말풍선"> |
+| **퇴근 임박** | <img src="docs/screenshots/photo-terminal-almost.png" width="300" alt="퇴근 임박 실사 터미널"> | <img src="docs/screenshots/photo-bubble-almost.png" width="180" alt="퇴근 임박 실사 말풍선"> |
+| **퇴근** | <img src="docs/screenshots/photo-terminal-done.png" width="300" alt="퇴근 실사 터미널"> | <img src="docs/screenshots/photo-bubble-done.png" width="180" alt="퇴근 실사 말풍선"> |
+| **야근** | <img src="docs/screenshots/photo-terminal-overtime.png" width="300" alt="야근 실사 터미널"> | <img src="docs/screenshots/photo-bubble-overtime.png" width="180" alt="야근 실사 말풍선"> |
+
 ### 설정
 
 메뉴에서 `설정…`을 누르면 창이 열립니다. 값을 바꾸면 바로 적용됩니다.
