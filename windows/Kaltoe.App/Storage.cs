@@ -105,6 +105,17 @@ internal static class LoginItem
         catch (Exception ex) { Log.Write($"자동 실행 설정 실패: {ex.Message}"); return false; }
     }
 
+    /// 자동 실행에 등록된 exe 경로 (따옴표 뺀 값). 없으면 null.
+    public static string? RegisteredPath()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKey);
+            return key?.GetValue(ValueName) is string s && s.Length > 0 ? s.Trim().Trim('"') : null;
+        }
+        catch (Exception ex) { Log.Write($"자동 실행 경로 조회 실패: {ex.Message}"); return null; }
+    }
+
     /// 켜져 있는데 경로가 지금 실행 파일과 다르면(exe 를 옮김) 현재 경로로 고쳐 쓴다.
     public static void RefreshPathIfEnabled()
     {
