@@ -40,9 +40,14 @@ jobs:
           dotnet publish windows/Kaltoe.App -c Release -r win-x64 --self-contained true
           -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true
           -p:EnableCompressionInSingleFile=true -o publish
-      - name: Self QA (launch, drag, relaunch, screenshots)
+      - name: Download previous release (for upgrade QA)
         shell: pwsh
-        run: pwsh windows/qa/qa.ps1 -Exe publish/Kaltoe.exe -Out qa-out
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download v1.1.0 -R ${{ github.repository }} -p Kaltoe-windows.zip -D old-release
+      - name: Self QA (launch, drag, relaunch, upgrade, screenshots)
+        shell: pwsh
+        run: pwsh windows/qa/qa.ps1 -Exe publish/Kaltoe.exe -Out qa-out -OldZip old-release/Kaltoe-windows.zip
       - uses: actions/upload-artifact@v4
         if: always()
         with:

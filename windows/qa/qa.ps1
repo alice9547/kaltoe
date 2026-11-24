@@ -1,6 +1,6 @@
 # 윈도우 서버에서 앱을 실제로 띄워 마우스로 조작해 보는 자가 QA.
 # 사용: pwsh windows/qa/qa.ps1 -Exe publish/Kaltoe.exe -Out qa-out
-param([string]$Exe = "publish/Kaltoe.exe", [string]$Out = "qa-out")
+param([string]$Exe = "publish/Kaltoe.exe", [string]$Out = "qa-out", [string]$OldZip = "")
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force $Out | Out-Null
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
@@ -260,6 +260,39 @@ Check 'settings-arg-opens-window-real' ($null -ne $sr) "rect=$($sr.X),$($sr.Y) $
 if ($sr) { Check 'settings-window-inside-workarea-real' (InsideWorkArea $sr) (WorkAreaText $sr) }
 Check 'settings-real-widget-still-visible' ($null -ne (Widget $p)) ""
 if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+
+# 12. 새 버전으로 갈아타기 (docs/spec.md 8절): 실제 옛 릴리스 exe 를 다른 폴더에서 켜 두고 새 exe 를 실행하면
+#     옛 프로세스는 꺼지고, 새 위젯이 보이고, 옛 exe·빈 폴더가 지워지고, 자동 실행 경로가 새 exe 로 바뀐다.
+$vi = (Get-Item $Exe).VersionInfo
+Check 'exe-version-info' ($vi.ProductName -eq '칼퇴' -and $vi.FileMajorPart -ge 1) "product=$($vi.ProductName) file=$($vi.FileVersion)"
+if ($OldZip -ne '') {
+  Get-Process Kaltoe -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep -Seconds 2
+  $oldDir = Join-Path $env:TEMP 'kaltoe-old\Kaltoe-windows_0712'
+  Remove-Item -Recurse -Force (Split-Path $oldDir) -ErrorAction SilentlyContinue
+  Expand-Archive -Path $OldZip -DestinationPath $oldDir -Force
+  $oldExe = Join-Path $oldDir 'Kaltoe.exe'
+  $ov = (Get-Item $oldExe).VersionInfo
+  Write-Host "old exe: $oldExe version=$($ov.FileVersion) product=$($ov.ProductName)"
+  $old = Start-Process -FilePath $oldExe -PassThru; Start-Sleep -Seconds 10
+  Check 'handoff-old-running' (-not $old.HasExited) "pid=$($old.Id)"
+  $run = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name Kaltoe -ErrorAction SilentlyContinue).Kaltoe
+  Write-Host "run key before: $run"
+  $p = Launch @()
+  Start-Sleep -Seconds 5
+  Dump 'handoff-new' $p; Shot '18-handoff'
+  $old.Refresh()
+  Check 'handoff-old-stopped' ($old.HasExited) ""
+  Check 'handoff-new-alive' (-not $p.HasExited) "pid=$($p.Id)"
+  Check 'handoff-new-widget-visible' ($null -ne (Widget $p)) ""
+  Check 'handoff-old-exe-deleted' (-not (Test-Path $oldExe)) $oldExe
+  Check 'handoff-old-folder-deleted' (-not (Test-Path $oldDir)) $oldDir
+  $run = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name Kaltoe -ErrorAction SilentlyContinue).Kaltoe
+  $full = (Resolve-Path $Exe).Path
+  Check 'handoff-run-key-updated' ($run -eq "`"$full`"") "run=$run"
+  # 옛 exe 를 다시 실행해도 새 버전이 그대로 남아 있어야 한다 (옛 버전은 새 버전에 양보)
+  Write-Host "--- error.log"; Get-Content (Join-Path $env:APPDATA 'Kaltoe\error.log') -ErrorAction SilentlyContinue | Select-Object -Last 10
+  if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+}
 
 Write-Host "--- event log"
 Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = (Get-Date).AddMinutes(-15) } -ErrorAction SilentlyContinue |
